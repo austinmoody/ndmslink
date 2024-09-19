@@ -1,0 +1,43 @@
+{
+  "resourceType": "ValueSet",
+  "url": "https://thsa1.sanerproject.org:10443/fhir/ValueSet/saner-job-types",
+  "status": "active",
+  "id": "saner-job-types",
+  "compose": {
+    "include": [
+      {
+        "system": "https://thsa1.sanerproject.org:10443/fhir/ValueSet/saner-job-types",
+        "concept": [
+          {
+            "code": "expunge-data",
+            "display": "Expunge Data"
+          },
+          {
+            "code": "manual-expunge",
+            "display": "Manual Expunge"
+          },
+          {
+            "code": "refresh-patient-list",
+            "display": "Refresh Patient List"
+          },
+          {
+            "code": "generate-report",
+            "display": "Generate Report"
+          },
+          {
+            "code": "file-upload",
+            "display": "Upload Data File"
+          },
+          {
+            "code": "external-file-download",
+            "display": "File Downloaded From Source"
+          },
+          {
+            "code": "send-report",
+            "display": "Send Report"
+          }
+        ]
+      }
+    ]
+  }
+}
