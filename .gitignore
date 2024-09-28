@@ -27,7 +27,6 @@ austin-api-config-dockercompose.yml
 austin-consumer-config.yml
 austin-datastore-config.yml
 austin-datastore-config-POSTGRES.yml
-docker-compose.yml
 knox-measure-report-transfer.known_hosts
 qodana.yaml
 docker-volumes/
@@ -37,3 +36,4 @@ Writerside/images/*
 Writerside/topics/*
 
 **/.aws-sam
+/.local.env
