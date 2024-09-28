@@ -45,3 +45,15 @@ services:
        interval: 30s
        timeout: 10s
        retries: 5
+  consumer:
+    container_name: "consumer"
+    build: ./consumer
+    ports:
+      - "9091:8080"
+    environment:
+      - SPRING_CONFIG_LOCATION=file:/consumer/consumer-config.yml
+      - consumer.datasource.url=${CONSUMER_DB_URL}
+    volumes:
+      - type: bind
+        source: ${CONSUMER_CONFIG_FILE}
+        target: /consumer/consumer-config.yml
