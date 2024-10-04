@@ -30,6 +30,9 @@ services:
         retries: 5
   datastore:
     container_name: "datastore"
+    cpu_count: 4
+    mem_limit: 4096m
+    mem_reservation: 4096m
     build: ./datastore
     ports:
       - "9092:8080"
