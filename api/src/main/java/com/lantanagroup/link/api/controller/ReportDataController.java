@@ -8,6 +8,7 @@ import com.lantanagroup.link.config.query.USCoreConfig;
 import com.lantanagroup.link.config.query.USCoreOtherResourceTypeConfig;
 import com.lantanagroup.link.model.ExpungeResourcesToDelete;
 import com.lantanagroup.link.model.Job;
+import com.lantanagroup.link.model.ScoopData;
 import com.lantanagroup.link.model.UploadFile;
 import lombok.Getter;
 import lombok.Setter;
@@ -32,6 +33,7 @@ import javax.xml.datatype.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -430,5 +432,33 @@ public class ReportDataController extends BaseController {
 
     return hasExpungeRole;
 
+  }
+
+  @PostMapping("/data/scoop")
+  public ResponseEntity<Job> scoopData(@AuthenticationPrincipal LinkCredentials user,
+                                       HttpServletRequest request,
+                                       @Valid @RequestBody ScoopData input,
+                                       BindingResult bindingResult
+  ) {
+
+    Task task = TaskHelper.getNewTask(user, Constants.SCOOP_DATA);
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
+    fhirDataProvider.updateResource(task);
+
+    if (bindingResult.hasErrors()) {
+      bindingResult.getAllErrors().forEach(
+              error -> {
+                Annotation note = new Annotation();
+                note.setText(error.getDefaultMessage());
+                note.setTime(new Date());
+                task.addNote(note);
+              }
+      );
+
+      task.setStatus(Task.TaskStatus.FAILED);
+      return ResponseEntity.badRequest().body(new Job(task));
+    }
+
+    return ResponseEntity.ok(new Job(task));
   }
 }

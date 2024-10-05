@@ -54,4 +54,5 @@ public class Constants {
   public static final Coding EXTERNAL_FILE_DOWNLOAD = new Coding().setCode("external-file-download").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("File Downloaded From Source");
   public static final Coding SEND_REPORT  = new Coding().setCode("send-report").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Send Report");
   public static final String DOCUMENT_REFERENCE_VERSION_URL = "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-report-version";
+  public static final Coding SCOOP_DATA = new Coding().setCode("scoop-data").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Scoop Data");
 }
