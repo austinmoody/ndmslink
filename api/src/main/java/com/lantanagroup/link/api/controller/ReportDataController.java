@@ -4,12 +4,12 @@ import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.*;
 import com.lantanagroup.link.auth.LinkCredentials;
 import com.lantanagroup.link.config.datagovernance.DataGovernanceConfig;
+import com.lantanagroup.link.config.query.QueryConfig;
 import com.lantanagroup.link.config.query.USCoreConfig;
 import com.lantanagroup.link.config.query.USCoreOtherResourceTypeConfig;
-import com.lantanagroup.link.model.ExpungeResourcesToDelete;
-import com.lantanagroup.link.model.Job;
-import com.lantanagroup.link.model.ScoopData;
-import com.lantanagroup.link.model.UploadFile;
+import com.lantanagroup.link.model.*;
+import com.lantanagroup.link.query.IQuery;
+import com.lantanagroup.link.query.QueryFactory;
 import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.r4.model.*;
@@ -17,12 +17,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import javax.annotation.PreDestroy;
 import javax.servlet.http.HttpServletRequest;
@@ -30,6 +32,8 @@ import javax.validation.Valid;
 import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.Duration;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -438,27 +442,168 @@ public class ReportDataController extends BaseController {
   public ResponseEntity<Job> scoopData(@AuthenticationPrincipal LinkCredentials user,
                                        HttpServletRequest request,
                                        @Valid @RequestBody ScoopData input,
-                                       BindingResult bindingResult
-  ) {
+                                       BindingResult bindingResult) {
 
     Task task = TaskHelper.getNewTask(user, Constants.SCOOP_DATA);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
-    fhirDataProvider.updateResource(task);
 
-    if (bindingResult.hasErrors()) {
-      bindingResult.getAllErrors().forEach(
-              error -> {
-                Annotation note = new Annotation();
-                note.setText(error.getDefaultMessage());
-                note.setTime(new Date());
-                task.addNote(note);
-              }
-      );
+    try {
 
+      // Verify payload
+      if (bindingResult.hasErrors()) {
+        String errorMessage = bindingResult.getAllErrors().stream()
+                .map(DefaultMessageSourceResolvable::getDefaultMessage)
+                .collect(Collectors.joining(", "));
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errorMessage);
+      }
+
+      ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getPeriodStart(), input.getPeriodEnd());
+
+      ReportContext reportContext = new ReportContext(this.getFhirDataProvider());
+      reportContext.setRequest(request);
+      reportContext.setUser(user);
+
+      // Scoop It
+
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with scooping data: %s", ex.getMessage());
+      logger.error(errorMessage);
+      Annotation note = new Annotation();
+      note.setText(errorMessage);
+      note.setTime(new Date());
+      task.addNote(note);
       task.setStatus(Task.TaskStatus.FAILED);
       return ResponseEntity.badRequest().body(new Job(task));
+    } finally {
+      task.setLastModified(new Date());
+      fhirDataProvider.updateResource(task);
     }
 
     return ResponseEntity.ok(new Job(task));
+  }
+
+  public void scoopDataOld(LinkCredentials user, ReportCriteria reportCriteria, ReportContext reportContext, String periodStart, String periodEnd, String[] bundleIds, String taskId) {
+
+    // Get the task so that it can be updated later
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
+    Task task = fhirDataProvider.getTaskById(taskId);
+
+    try {
+      // Add parameters used to scoop data to Task
+      Annotation note = new Annotation();
+      note.setTime(new Date());
+      note.setText(String.format("Scooping data with paramters: periodStart - %s / periodEnd - %s / bundleIds - %s",
+              periodStart,
+              periodEnd,
+              String.join(",", bundleIds)));
+      task.addNote(note);
+
+      // Get Measure definition from CQF server
+      this.resolveMeasures(reportCriteria, reportContext);
+
+      String masterIdentifierValue = ReportIdHelper.getMasterIdentifierValue(reportCriteria);
+
+      // Add note to Task
+      note = new Annotation();
+      note.setTime(new Date());
+      note.setText(String.format("Scooping data for master identifier: %s", masterIdentifierValue));
+      task.addNote(note);
+
+      // Get the patient identifiers for the given date
+      getPatientIdentifiers(reportCriteria, reportContext);
+
+      if (reportContext.getPatientCensusLists().isEmpty()) {
+        String msg = "A census for the specified criteria was not found.";
+        logger.error(msg);
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, msg);
+      }
+
+      // Add Lists(s) being process for report to Task
+      List<String> listsIds = new ArrayList<>();
+      for (ListResource lr : reportContext.getPatientCensusLists()) {
+        listsIds.add(lr.getIdElement().getIdPart());
+      }
+      note = new Annotation();
+      note.setTime(new Date());
+      note.setText(String.format("Patient Census Lists processed: %s", String.join(",", listsIds)));
+      task.addNote(note);
+
+      // Get the resource types to query
+      // First from the Measure definition
+      // But then only retain what is configured in uscore.patient-resource-types
+      // RECONSIDER: This was important for THSA because we used CQL.  For NDMS we are doing more of a manual
+      //             calculation so we really only care about what we have configured in uscore to scoop.
+      Set<String> resourceTypesToQuery = new HashSet<>();
+      for (ReportContext.MeasureContext measureContext : reportContext.getMeasureContexts()) {
+        resourceTypesToQuery.addAll(FhirHelper.getDataRequirementTypes(measureContext.getReportDefBundle()));
+      }
+      resourceTypesToQuery.retainAll(usCoreConfig.getPatientResourceTypes());
+
+      // Add list of Resource types that we are going to query to the Task
+      note = new Annotation();
+      note.setTime(new Date());
+      note.setText(String.format("Scooping the following Resource types: %s", String.join(",", resourceTypesToQuery)));
+      task.addNote(note);
+
+      // TODO: Update audit to accept remoteAddress instead of request.  Ultimately that is all that FhirHelper pulls from request
+      //this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Initiating Query For Resources");
+
+      // Scoop the data for the patients and store it
+      QueryConfig queryConfig = this.context.getBean(QueryConfig.class);
+      IQuery query = QueryFactory.getQueryInstance(this.context, queryConfig.getQueryClass());
+      List<String> measureIds = reportContext.getMeasureContexts().stream()
+              .map(measureContext -> measureContext.getMeasure().getIdentifierFirstRep().getValue())
+              .collect(Collectors.toList());
+      query.execute(reportCriteria, reportContext, reportContext.getPatientsOfInterest(), masterIdentifierValue, new ArrayList<>(resourceTypesToQuery), measureIds);
+
+      note = new Annotation();
+      note.setTime(new Date());
+      note.setText("Scooping complete");
+      task.addNote(note);
+
+      task.setStatus(Task.TaskStatus.COMPLETED);
+
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with scooping data: %s", ex.getMessage());
+      logger.error(errorMessage);
+      Annotation note = new Annotation();
+      note.setText(errorMessage);
+      note.setTime(new Date());
+      task.addNote(note);
+      task.setStatus(Task.TaskStatus.FAILED);
+    } finally {
+      task.setLastModified(new Date());
+      fhirDataProvider.updateResource(task);
+    }
+  }
+
+  private void getPatientIdentifiers(ReportCriteria criteria, ReportContext context) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
+    IPatientIdProvider provider;
+    Class<?> patientIdResolverClass = Class.forName(this.config.getPatientIdResolver());
+    Constructor<?> patientIdentifierConstructor = patientIdResolverClass.getConstructor();
+    provider = (IPatientIdProvider) patientIdentifierConstructor.newInstance();
+    provider.getPatientsOfInterest(criteria, context, this.config);
+  }
+
+  private void resolveMeasures(ReportCriteria criteria, ReportContext context) throws Exception {
+    context.getMeasureContexts().clear();
+    for (String bundleId : criteria.getBundleIds()) {
+
+      // Pull the report definition bundle from CQF (eval service)
+      FhirDataProvider evaluationProvider = new FhirDataProvider(config.getEvaluationService());
+      Bundle reportDefBundle = evaluationProvider.getBundleById(bundleId);
+
+      // Update the context
+      ReportContext.MeasureContext measureContext = new ReportContext.MeasureContext();
+      measureContext.setReportDefBundle(reportDefBundle);
+      measureContext.setBundleId(reportDefBundle.getIdElement().getIdPart());
+      Measure measure = FhirHelper.getMeasure(reportDefBundle);
+      measureContext.setMeasure(measure);
+      context.getMeasureContexts().add(measureContext);
+    }
+  }
+
+  private void scoopData() {
+
   }
 }

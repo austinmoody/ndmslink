@@ -76,6 +76,7 @@ public class ReportController extends BaseController {
     binder.setDisallowedFields(DISALLOWED_FIELDS);
   }
 
+  // TODO - remove me here once scoop finished in ReportDataController
   private void resolveMeasures(ReportCriteria criteria, ReportContext context) throws Exception {
     context.getMeasureContexts().clear();
     for (String bundleId : criteria.getBundleIds()) {
