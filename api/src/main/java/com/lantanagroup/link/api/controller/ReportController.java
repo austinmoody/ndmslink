@@ -160,7 +160,7 @@ public class ReportController extends BaseController {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "A report has already been generated for the specified measure and reporting period. To regenerate the report, submit your request with regenerate=true.");
     }
 
-    Task task = TaskHelper.getNewTask(user, Constants.GENERATE_REPORT);
+    Task task = TaskHelper.getNewTask(user, request, Constants.GENERATE_REPORT);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(task);
     Job job = new Job(task);
@@ -202,7 +202,7 @@ public class ReportController extends BaseController {
     }
     singleMeasureBundleIds = apiMeasurePackage.get().getBundleIds();
 
-    Task response = TaskHelper.getNewTask(user, Constants.GENERATE_REPORT);
+    Task response = TaskHelper.getNewTask(user, request, Constants.GENERATE_REPORT);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(response);
 
@@ -598,7 +598,7 @@ public class ReportController extends BaseController {
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Not configured for sending");
     }
 
-    Task task = TaskHelper.getNewTask(user, Constants.SEND_REPORT);
+    Task task = TaskHelper.getNewTask(user, request, Constants.SEND_REPORT);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(task);
 

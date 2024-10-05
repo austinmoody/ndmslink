@@ -87,7 +87,7 @@ public class ReportDataController extends BaseController {
 
     logger.info("Received UploadFile of Type '{}' and Name '{}'", uploadFile.getType(), uploadFile.getName());
 
-    Task task = TaskHelper.getNewTask(user, Constants.FILE_UPLOAD);
+    Task task = TaskHelper.getNewTask(user, request, Constants.FILE_UPLOAD);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(task);
     Job job = new Job(task);
@@ -239,7 +239,7 @@ public class ReportDataController extends BaseController {
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorMessage);
     }
 
-    Task task = TaskHelper.getNewTask(user, Constants.MANUAL_EXPUNGE);
+    Task task = TaskHelper.getNewTask(user, request, Constants.MANUAL_EXPUNGE);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(task);
     Job job = new Job(task);
@@ -340,7 +340,7 @@ public class ReportDataController extends BaseController {
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("User does not have proper role to expunge data.");
     }
 
-    Task task = TaskHelper.getNewTask(user, Constants.EXPUNGE_TASK);
+    Task task = TaskHelper.getNewTask(user, request, Constants.EXPUNGE_TASK);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(task);
     Job job = new Job(task);
@@ -444,7 +444,7 @@ public class ReportDataController extends BaseController {
                                        @Valid @RequestBody ScoopData input,
                                        BindingResult bindingResult) {
 
-    Task task = TaskHelper.getNewTask(user, Constants.SCOOP_DATA);
+    Task task = TaskHelper.getNewTask(user, request, Constants.SCOOP_DATA);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
 
     try {
