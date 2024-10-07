@@ -463,12 +463,16 @@ public class ReportDataController extends BaseController {
       reportContext.setRequest(request);
       reportContext.setUser(user);
 
+      task.addNote(input.getAnnotation());
+      fhirDataProvider.updateResource(task);
+
       // Scoop It
+      executor.submit(() -> scoopData(user, criteria, reportContext, task.getId()));
 
       this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Successfully Initiated Query");
 
     } catch (Exception ex) {
-      String errorMessage = String.format("Issue with scooping data: %s", ex.getMessage());
+      String errorMessage = String.format("Issue with data scoop API call: %s", ex.getMessage());
       logger.error(errorMessage);
       Annotation note = new Annotation();
       note.setText(errorMessage);
@@ -484,7 +488,7 @@ public class ReportDataController extends BaseController {
     return ResponseEntity.ok(new Job(task));
   }
 
-  public void scoopDataOld(LinkCredentials user, ReportCriteria reportCriteria, ReportContext reportContext, String periodStart, String periodEnd, String[] bundleIds, String taskId) {
+  private void scoopData(LinkCredentials user, ReportCriteria reportCriteria, ReportContext reportContext, String taskId) {
 
     // Get the task so that it can be updated later
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
@@ -492,13 +496,7 @@ public class ReportDataController extends BaseController {
 
     try {
       // Add parameters used to scoop data to Task
-      Annotation note = new Annotation();
-      note.setTime(new Date());
-      note.setText(String.format("Scooping data with paramters: periodStart - %s / periodEnd - %s / bundleIds - %s",
-              periodStart,
-              periodEnd,
-              String.join(",", bundleIds)));
-      task.addNote(note);
+      task.addNote(reportCriteria.getAnnotation());
 
       // Get Measure definition from CQF server
       this.resolveMeasures(reportCriteria, reportContext);
@@ -506,7 +504,7 @@ public class ReportDataController extends BaseController {
       String masterIdentifierValue = ReportIdHelper.getMasterIdentifierValue(reportCriteria);
 
       // Add note to Task
-      note = new Annotation();
+      Annotation note = new Annotation();
       note.setTime(new Date());
       note.setText(String.format("Scooping data for master identifier: %s", masterIdentifierValue));
       task.addNote(note);
@@ -547,7 +545,6 @@ public class ReportDataController extends BaseController {
       note.setText(String.format("Scooping the following Resource types: %s", String.join(",", resourceTypesToQuery)));
       task.addNote(note);
 
-      // TODO: Update audit to accept remoteAddress instead of request.  Ultimately that is all that FhirHelper pulls from request
       this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Initiating Query For Resources");
 
       // Scoop the data for the patients and store it
