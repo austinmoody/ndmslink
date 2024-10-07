@@ -65,4 +65,9 @@ public class Constants {
           .setSystem(SANER_JOB_TYPE_SYSTEM)
           .setDisplay("Report Download")
           .setCode("report-download");
+
+  public static final Coding REPORT_SEARCH = new Coding()
+          .setSystem(SANER_JOB_TYPE_SYSTEM)
+          .setDisplay("Report Search")
+          .setCode("report-search");
 }

@@ -872,7 +872,7 @@ public class ReportController extends BaseController {
 
   @GetMapping(produces = {MediaType.APPLICATION_JSON_VALUE})
   public ReportBundle searchReports(
-          Authentication authentication,
+          @AuthenticationPrincipal LinkCredentials user,
           HttpServletRequest request,
           @RequestParam(required = false, defaultValue = "1") Integer page,
           @RequestParam(required = false) String author,
@@ -884,118 +884,178 @@ public class ReportController extends BaseController {
           @RequestParam(required = false) String submitted)
           throws Exception {
 
-    Bundle bundle;
-    boolean andCond = false;
+    Task task = TaskHelper.getNewTask(user, request, Constants.REPORT_SEARCH);
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
+
     ReportBundle reportBundle = new ReportBundle();
 
-    String url = this.config.getDataStore().getBaseUrl();
-    if (!url.endsWith("/")) url += "/";
-    url += "DocumentReference?";
-    if (author != null) {
-      url += "author=" + author;
-      andCond = true;
-    }
-    if (identifier != null) {
-      if (andCond) {
-        url += "&";
+    try {
+      Bundle bundle;
+      boolean andCond = false;
+
+      String url = this.config.getDataStore().getBaseUrl();
+      if (!url.endsWith("/")) url += "/";
+      url += "DocumentReference?";
+      if (author != null) {
+
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter author = %s",  author));
+        note.setTime(new Date());
+        task.addNote(note);
+
+        url += "author=" + author;
+        andCond = true;
       }
-      url += "identifier=" + Helper.URLEncode(identifier);
-      andCond = true;
-    }
-    if (periodStartDate != null) {
-      if (andCond) {
-        url += "&";
-      }
-      url += PeriodStartParamName + "=ge" + periodStartDate;
-      andCond = true;
-    }
-    if (periodEndDate != null) {
-      if (andCond) {
-        url += "&";
-      }
-      url += PeriodEndParamName + "=le" + periodEndDate;
-      andCond = true;
-    }
-    if (docStatus != null) {
-      if (andCond) {
-        url += "&";
-      }
-      url += "docStatus=" + docStatus.toLowerCase();
-      andCond = true;
-    }
+      if (identifier != null) {
 
-    Boolean submittedBoolean = null;
-    if (submitted != null) {
-      submittedBoolean = Boolean.parseBoolean(submitted);
-    }
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter identifier = %s",  identifier));
+        note.setTime(new Date());
+        task.addNote(note);
 
-    if (Boolean.TRUE.equals(submittedBoolean)) {
-      // We want to find documents that have been submitted.  Which
-      // should mean that docStatus = final and the date isn't null.
-      // All we can do here is search for docStatus = final then later
-      // also verify that the date has a value.
-      if (andCond) {
-        url += "&";
-      }
-      url += "docStatus=final";
-      andCond = true;
-    } else if (Boolean.FALSE.equals(submittedBoolean)) {
-      // We want to fnd documents that HAVE NOT been submitted.  Which
-      // should mean that docStatus <> final and that the date field is
-      // either missing or set to null.  Which we have to check later.
-      if (andCond) {
-        url += "&";
-      }
-      url += "_filter=docStatus+ne+final";
-      andCond = true;
-    }
-
-    if (submittedDate != null) {
-      if (andCond) {
-        url += "&";
-      }
-      Date submittedDateAsDate = Helper.parseFhirDate(submittedDate);
-      Date theDayAfterSubmittedDateEnd = Helper.addDays(submittedDateAsDate, 1);
-      String theDayAfterSubmittedDateEndAsString = Helper.getFhirDate(theDayAfterSubmittedDateEnd);
-      url += "date=ge" + submittedDate + "&date=le" + theDayAfterSubmittedDateEndAsString;
-    }
-
-    bundle = this.getFhirDataProvider().fetchResourceFromUrl(url);
-    List<Report> lst = bundle.getEntry().parallelStream().map(Report::new).collect(Collectors.toList());
-
-    // Remove items from lst if we are searching for submitted only but the date is null
-    // Only DocumentReferences that have been submitted will have a value for date.
-    if (Boolean.TRUE.equals(submittedBoolean)) {
-      lst.removeIf(report -> report.getSubmittedDate() == null);
-    }
-
-    // Remove items from lst if we are searching for non-submitted but the date
-    // has a value.  Only DocumentReference that have been submitted will have a value for
-    // date
-    if (Boolean.FALSE.equals(submittedBoolean)) {
-      lst.removeIf(report -> report.getSubmittedDate() != null);
-    }
-
-
-    List<String> reportIds = lst.stream().map(report -> ReportIdHelper.getMasterMeasureReportId(report.getId(),report.getReportMeasure().getValue())).collect(Collectors.toList());
-    Bundle response = this.getFhirDataProvider().getMeasureReportsByIds(reportIds);
-
-    response.getEntry().parallelStream().forEach(bundleEntry -> {
-      if (bundleEntry.getResource().getResourceType().equals(ResourceType.MeasureReport)) {
-        MeasureReport measureReport = (MeasureReport) bundleEntry.getResource();
-        Extension extension = measureReport.getExtensionByUrl(Constants.NotesUrl);
-        Report foundReport = lst.stream().filter(rep -> rep.getId().equals(measureReport.getIdElement().getIdPart().split("-")[0])).findAny().orElse(null);
-        if (extension != null && foundReport != null) {
-          foundReport.setNote(extension.getValue().toString());
+        if (andCond) {
+          url += "&";
         }
+        url += "identifier=" + Helper.URLEncode(identifier);
+        andCond = true;
       }
-    });
-    reportBundle.setReportTypeId(bundle.getId());
-    reportBundle.setList(lst);
-    reportBundle.setTotalSize(bundle.getTotal());
+      if (periodStartDate != null) {
 
-    // TODO: Austin to create Task and uncomment audit below
-    //this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(), FhirHelper.AuditEventTypes.SearchReports, "Successfully Searched Reports");
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter period start date = %s",  periodStartDate));
+        note.setTime(new Date());
+        task.addNote(note);
+
+        if (andCond) {
+          url += "&";
+        }
+        url += PeriodStartParamName + "=ge" + periodStartDate;
+        andCond = true;
+      }
+      if (periodEndDate != null) {
+
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter period end date = %s",  periodEndDate));
+        note.setTime(new Date());
+        task.addNote(note);
+
+        if (andCond) {
+          url += "&";
+        }
+        url += PeriodEndParamName + "=le" + periodEndDate;
+        andCond = true;
+      }
+      if (docStatus != null) {
+
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter document status = %s",  docStatus));
+        note.setTime(new Date());
+        task.addNote(note);
+
+        if (andCond) {
+          url += "&";
+        }
+        url += "docStatus=" + docStatus.toLowerCase();
+        andCond = true;
+      }
+
+      Boolean submittedBoolean = null;
+      if (submitted != null) {
+        submittedBoolean = Boolean.parseBoolean(submitted);
+
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter submitted = %s",  submittedBoolean));
+        note.setTime(new Date());
+        task.addNote(note);
+
+      }
+
+      if (Boolean.TRUE.equals(submittedBoolean)) {
+        // We want to find documents that have been submitted.  Which
+        // should mean that docStatus = final and the date isn't null.
+        // All we can do here is search for docStatus = final then later
+        // also verify that the date has a value.
+        if (andCond) {
+          url += "&";
+        }
+        url += "docStatus=final";
+        andCond = true;
+      } else if (Boolean.FALSE.equals(submittedBoolean)) {
+        // We want to fnd documents that HAVE NOT been submitted.  Which
+        // should mean that docStatus <> final and that the date field is
+        // either missing or set to null.  Which we have to check later.
+        if (andCond) {
+          url += "&";
+        }
+        url += "_filter=docStatus+ne+final";
+        andCond = true;
+      }
+
+      if (submittedDate != null) {
+
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter submitted date = %s",  submittedDate));
+        note.setTime(new Date());
+        task.addNote(note);
+
+        if (andCond) {
+          url += "&";
+        }
+        Date submittedDateAsDate = Helper.parseFhirDate(submittedDate);
+        Date theDayAfterSubmittedDateEnd = Helper.addDays(submittedDateAsDate, 1);
+        String theDayAfterSubmittedDateEndAsString = Helper.getFhirDate(theDayAfterSubmittedDateEnd);
+        url += "date=ge" + submittedDate + "&date=le" + theDayAfterSubmittedDateEndAsString;
+      }
+
+      bundle = this.getFhirDataProvider().fetchResourceFromUrl(url);
+      List<Report> lst = bundle.getEntry().parallelStream().map(Report::new).collect(Collectors.toList());
+
+      // Remove items from lst if we are searching for submitted only but the date is null
+      // Only DocumentReferences that have been submitted will have a value for date.
+      if (Boolean.TRUE.equals(submittedBoolean)) {
+        lst.removeIf(report -> report.getSubmittedDate() == null);
+      }
+
+      // Remove items from lst if we are searching for non-submitted but the date
+      // has a value.  Only DocumentReference that have been submitted will have a value for
+      // date
+      if (Boolean.FALSE.equals(submittedBoolean)) {
+        lst.removeIf(report -> report.getSubmittedDate() != null);
+      }
+
+      List<String> reportIds = lst.stream().map(report -> ReportIdHelper.getMasterMeasureReportId(report.getId(), report.getReportMeasure().getValue())).collect(Collectors.toList());
+      Bundle response = this.getFhirDataProvider().getMeasureReportsByIds(reportIds);
+
+      response.getEntry().parallelStream().forEach(bundleEntry -> {
+        if (bundleEntry.getResource().getResourceType().equals(ResourceType.MeasureReport)) {
+          MeasureReport measureReport = (MeasureReport) bundleEntry.getResource();
+          Extension extension = measureReport.getExtensionByUrl(Constants.NotesUrl);
+          Report foundReport = lst.stream().filter(rep -> rep.getId().equals(measureReport.getIdElement().getIdPart().split("-")[0])).findAny().orElse(null);
+          if (extension != null && foundReport != null) {
+            foundReport.setNote(extension.getValue().toString());
+          }
+        }
+      });
+      reportBundle.setReportTypeId(bundle.getId());
+      reportBundle.setList(lst);
+      reportBundle.setTotalSize(bundle.getTotal());
+
+      task.setStatus(Task.TaskStatus.COMPLETED);
+
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.SearchReports, "Successfully Searched Reports");
+
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with searching reports: %s", ex.getMessage());
+      logger.error(errorMessage);
+      Annotation note = new Annotation();
+      note.setText(errorMessage);
+      note.setTime(new Date());
+      task.addNote(note);
+      task.setStatus(Task.TaskStatus.FAILED);
+    } finally {
+      task.setLastModified(new Date());
+      fhirDataProvider.updateResource(task);
+    }
 
     return reportBundle;
   }
