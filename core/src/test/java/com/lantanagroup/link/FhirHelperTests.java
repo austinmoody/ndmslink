@@ -3,6 +3,7 @@ package com.lantanagroup.link;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.rest.api.MethodOutcome;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.lantanagroup.link.auth.LinkCredentials;
 import com.lantanagroup.link.config.api.ApiConfig;
 import com.lantanagroup.link.config.api.ApiReportDefsBundleConfig;
 import com.lantanagroup.link.config.api.ApiReportDefsConfig;
@@ -68,6 +69,19 @@ public class FhirHelperTests {
     fhirHelperTest = new FhirHelper();
     httpServletRequestTest = mock(HttpServletRequest.class);
     decodedJWTTest = mock(DecodedJWT.class);
+
+    Practitioner mockPractitioner = mock(Practitioner.class);
+    List<Identifier> identifiers = new ArrayList<>();
+    Identifier identifier = new Identifier();
+    identifier.setValue("123456");
+    identifiers.add(identifier);
+    when(mockPractitioner.getIdentifier()).thenReturn(identifiers);
+
+    LinkCredentials mockUser = new LinkCredentials();
+    mockUser.setJwt(mock(DecodedJWT.class));
+    mockUser.setPractitioner(mockPractitioner);
+
+    HttpServletRequest request = mock(HttpServletRequest.class);
     iIdType = mock(IIdType.class);
     iIdType.setValue("Test Audit Event");
     outcomeTest = new MethodOutcome();
@@ -76,8 +90,7 @@ public class FhirHelperTests {
     when(decodedJWTTest.getPayload()).thenReturn("e30");
     when(fhirDataProviderTest.createOutcome(any())).thenReturn(outcomeTest);
 
-    // TODO - create valid Task w/ remote address
-    Task jobTask = new Task();
+    Task jobTask = TaskHelper.getNewTask(mockUser, request, Constants.SCOOP_DATA);
 
     FhirHelper.recordAuditEvent(jobTask, fhirDataProviderTest, decodedJWTTest, FhirHelper.AuditEventTypes.Generate, "Testing String");
   }
