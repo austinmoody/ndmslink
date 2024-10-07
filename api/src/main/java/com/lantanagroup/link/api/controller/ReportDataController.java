@@ -465,6 +465,8 @@ public class ReportDataController extends BaseController {
 
       // Scoop It
 
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Successfully Initiated Query");
+
     } catch (Exception ex) {
       String errorMessage = String.format("Issue with scooping data: %s", ex.getMessage());
       logger.error(errorMessage);

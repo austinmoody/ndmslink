@@ -33,13 +33,10 @@ public class TaskHelper {
         responseTask.setRequester(callingUser);
 
         // Add remote address
-        String remoteAddress = RemoteAddressHelper.getRemoteAddress(httpServletRequest);
+        String remoteAddress = RemoteAddressHelper.getRemoteAddressFromRequest(httpServletRequest);
         Task.ParameterComponent remoteAddressInput = new Task.ParameterComponent();
         remoteAddressInput.setType(new CodeableConcept().addCoding(
-                new Coding()
-                        .setSystem("https://thsa1.sanerproject.org:10443/fhir/CodeSystem/task-input-types")
-                        .setCode("remote-address")
-                        .setDisplay("Remote Address")
+                Constants.REMOTE_ADDRESS
         ));
         remoteAddressInput.setValue(new StringType(remoteAddress));
         responseTask.addInput(remoteAddressInput);

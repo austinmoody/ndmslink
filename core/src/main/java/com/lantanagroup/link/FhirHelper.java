@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.gson.*;
 import com.lantanagroup.link.config.api.ApiConfig;
 import com.lantanagroup.link.config.api.ApiReportDefsBundleConfig;
+import com.lantanagroup.link.helpers.RemoteAddressHelper;
 import com.lantanagroup.link.model.PatientReportModel;
 import com.lantanagroup.link.serialize.FhirJsonDeserializer;
 import com.lantanagroup.link.serialize.FhirJsonSerializer;
@@ -90,9 +91,7 @@ public class FhirHelper {
       agent.setAltId(jsonObject.get(SUBJECT).toString());
     }
 
-    String remoteAddress = "";
-    //remoteAddress = getRemoteAddress(request);
-
+    String remoteAddress = RemoteAddressHelper.getRemoteAddressFromTask(jobTask);
 
     if (remoteAddress != null) {
       agent.setNetwork(new AuditEvent.AuditEventAgentNetworkComponent().setAddress(remoteAddress));

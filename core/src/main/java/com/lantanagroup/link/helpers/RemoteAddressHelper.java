@@ -1,5 +1,8 @@
 package com.lantanagroup.link.helpers;
 
+import com.lantanagroup.link.Constants;
+import org.hl7.fhir.r4.model.StringType;
+import org.hl7.fhir.r4.model.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +31,7 @@ public class RemoteAddressHelper {
         throw new IllegalStateException("Helper class");
     }
 
-    public static String getRemoteAddress(HttpServletRequest request) {
+    public static String getRemoteAddressFromRequest(HttpServletRequest request) {
         for (String header : IP_HEADERS) {
             String ip = request.getHeader(header);
             if (isValidIp(ip)) {
@@ -40,6 +43,26 @@ public class RemoteAddressHelper {
         String remoteAddr = request.getRemoteAddr();
         logger.debug("No valid IP found in headers. Use remote address: {}", remoteAddr);
         return remoteAddr;
+    }
+
+    public static String getRemoteAddressFromTask(Task task) {
+        if (task == null || task.getInput() == null) {
+            return null;
+        }
+
+        return task.getInput().stream()
+                .filter(param -> param.getType() != null
+                        && param.getType().getCoding() != null
+                        && param.getType().getCoding().stream()
+                        .anyMatch(coding -> Constants.REMOTE_ADDRESS.equals(coding)))
+                .findFirst()
+                .map(param -> {
+                    if (param.getValue() instanceof StringType) {
+                        return ((StringType) param.getValue()).getValue();
+                    }
+                    return null;
+                })
+                .orElse(null);
     }
 
     private static boolean isValidIp(String ipAddress) {
