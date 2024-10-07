@@ -614,22 +614,40 @@ public class ReportController extends BaseController {
           @PathVariable String reportId,
           @PathVariable String type,
           HttpServletResponse response,
-          Authentication authentication,
-          HttpServletRequest request) throws Exception {
+          @AuthenticationPrincipal LinkCredentials user,
+          HttpServletRequest request) {
 
-    if (StringUtils.isEmpty(this.config.getDownloader()))
-      throw new IllegalStateException("Not configured for downloading");
+    // TODO: Austin to verify this after getting new reports to generate
 
-    // TODO - Austin add Task and uncomment audit below!
+    Task task = TaskHelper.getNewTask(user, request, Constants.REPORT_DOWNLOAD);
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
 
-    IReportDownloader downloader;
-    Class<?> downloaderClass = Class.forName(this.config.getDownloader());
-    Constructor<?> downloaderCtor = downloaderClass.getConstructor();
-    downloader = (IReportDownloader) downloaderCtor.newInstance();
+    try {
 
-    downloader.download(reportId, type, this.getFhirDataProvider(), response, this.ctx, this.bundlerConfig, this.eventService);
+      if (StringUtils.isEmpty(this.config.getDownloader()))
+        throw new IllegalStateException("Not configured for downloading");
 
-    //this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(), FhirHelper.AuditEventTypes.Export, "Successfully Exported Report for Download");
+      IReportDownloader downloader;
+      Class<?> downloaderClass = Class.forName(this.config.getDownloader());
+      Constructor<?> downloaderCtor = downloaderClass.getConstructor();
+      downloader = (IReportDownloader) downloaderCtor.newInstance();
+
+      downloader.download(reportId, type, this.getFhirDataProvider(), response, this.ctx, this.bundlerConfig, this.eventService);
+
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.Export, "Successfully Exported Report for Download");
+
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with download: %s", ex.getMessage());
+      logger.error(errorMessage);
+      Annotation note = new Annotation();
+      note.setText(errorMessage);
+      note.setTime(new Date());
+      task.addNote(note);
+      task.setStatus(Task.TaskStatus.FAILED);
+    } finally {
+      task.setLastModified(new Date());
+      fhirDataProvider.updateResource(task);
+    }
   }
 
   @GetMapping(value = "/{reportId}")

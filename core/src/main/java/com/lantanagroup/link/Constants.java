@@ -60,4 +60,9 @@ public class Constants {
           .setSystem("https://thsa1.sanerproject.org:10443/fhir/CodeSystem/task-input-types")
           .setCode("remote-address")
           .setDisplay("Remote Address");
+
+  public static final Coding REPORT_DOWNLOAD = new Coding()
+          .setSystem(SANER_JOB_TYPE_SYSTEM)
+          .setDisplay("Report Download")
+          .setCode("report-download");
 }
