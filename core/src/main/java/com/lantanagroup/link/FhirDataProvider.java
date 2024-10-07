@@ -274,8 +274,8 @@ public class FhirDataProvider {
     return (Measure) measureBundle.getEntryFirstRep().getResource();
   }
 
-  public void audit(HttpServletRequest request, DecodedJWT jwt, FhirHelper.AuditEventTypes type, String outcomeDescription) {
-    AuditEvent auditEvent = FhirHelper.createAuditEvent(request, jwt, type, outcomeDescription);
+  public void audit(Task jobTask, DecodedJWT jwt, FhirHelper.AuditEventTypes type, String outcomeDescription) {
+    AuditEvent auditEvent = FhirHelper.createAuditEvent(jobTask, jwt, type, outcomeDescription);
     this.createResource(auditEvent);
   }
 

@@ -346,7 +346,7 @@ public class ReportController extends BaseController {
 
       response.setMasterId(reportContext.getMasterIdentifierValue());
 
-      this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Successfully Initiated Query");
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Successfully Initiated Query");
 
       for (ReportContext.MeasureContext measureContext : reportContext.getMeasureContexts()) {
 
@@ -398,7 +398,7 @@ public class ReportController extends BaseController {
 
       this.getFhirDataProvider().updateResource(documentReference);
 
-      this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.Generate, "Successfully Generated Report");
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.Generate, "Successfully Generated Report");
       logger.info(String.format("Done generating report %s", documentReference.getIdElement().getIdPart()));
 
       this.stopwatchManager.print();
@@ -558,7 +558,7 @@ public class ReportController extends BaseController {
       note.setText(noteMessage);
       task.addNote(note);
 
-      this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.Send, "Successfully Sent Report");
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.Send, "Successfully Sent Report");
 
       //reportContext.getPatientCensusLists().get(0).getIdElement().getIdPart()
       task.setStatus(Task.TaskStatus.COMPLETED);
@@ -620,6 +620,8 @@ public class ReportController extends BaseController {
     if (StringUtils.isEmpty(this.config.getDownloader()))
       throw new IllegalStateException("Not configured for downloading");
 
+    // TODO - Austin add Task and uncomment audit below!
+
     IReportDownloader downloader;
     Class<?> downloaderClass = Class.forName(this.config.getDownloader());
     Constructor<?> downloaderCtor = downloaderClass.getConstructor();
@@ -627,7 +629,7 @@ public class ReportController extends BaseController {
 
     downloader.download(reportId, type, this.getFhirDataProvider(), response, this.ctx, this.bundlerConfig, this.eventService);
 
-    this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(), FhirHelper.AuditEventTypes.Export, "Successfully Exported Report for Download");
+    //this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(), FhirHelper.AuditEventTypes.Export, "Successfully Exported Report for Download");
   }
 
   @GetMapping(value = "/{reportId}")
@@ -702,9 +704,10 @@ public class ReportController extends BaseController {
     this.getFhirDataProvider().updateResource(data.getMeasureReport());
 
     // TODO: Wrong audit event type? We're saving the report, not sending it
-    this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(),
-            FhirHelper.AuditEventTypes.Send, "Successfully updated MeasureReport with id: " +
-                    documentReference.getMasterIdentifier().getValue());
+    // TODO: Austin create Task for this call and uncomment the audit below
+//    this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(),
+//            FhirHelper.AuditEventTypes.Send, "Successfully updated MeasureReport with id: " +
+//                    documentReference.getMasterIdentifier().getValue());
   }
 
   /**
@@ -811,6 +814,8 @@ public class ReportController extends BaseController {
     // generate code are we storing Patient bundles under that id... only storing
     // under 430749b-patidhash.
     // So here stripping off the measure hash from the passed in id.
+    // ALM 05Oct2024 -> Do we need/want this?  Move to Data Controller with the rest of the Expunge as
+    // UI is no longer in use.
     String masterReportId = id;
     String[] idParts = id.split("-");
     if (idParts.length > 1) {
@@ -841,9 +846,10 @@ public class ReportController extends BaseController {
     deleteRequest.getEntry().get(1).getRequest().setUrl("DocumentReference/" + documentReferenceId);
     this.getFhirDataProvider().transaction(deleteRequest);
 
-    this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(),
-            FhirHelper.AuditEventTypes.Export, "Successfully deleted DocumentReference" +
-                    documentReferenceId + " and MeasureReport " + documentReference.getMasterIdentifier().getValue());
+    // TODO: Austin to create Task for this call and uncomment the audit below.
+//    this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(),
+//            FhirHelper.AuditEventTypes.Export, "Successfully deleted DocumentReference" +
+//                    documentReferenceId + " and MeasureReport " + documentReference.getMasterIdentifier().getValue());
   }
 
   @GetMapping(produces = {MediaType.APPLICATION_JSON_VALUE})
@@ -970,7 +976,8 @@ public class ReportController extends BaseController {
     reportBundle.setList(lst);
     reportBundle.setTotalSize(bundle.getTotal());
 
-    this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(), FhirHelper.AuditEventTypes.SearchReports, "Successfully Searched Reports");
+    // TODO: Austin to create Task and uncomment audit below
+    //this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(), FhirHelper.AuditEventTypes.SearchReports, "Successfully Searched Reports");
 
     return reportBundle;
   }
@@ -1178,7 +1185,8 @@ public class ReportController extends BaseController {
     this.getFhirDataProvider().transaction(reportUpdateBundle);
 
     // Record an audit event that the report has had exclusions
-    this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.ExcludePatients, String.format("Excluded %s patients from report %s", excludedPatients.size(), reportId));
+    // TODO: Austin to create Task for this call and uncomment audit below
+    //this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.ExcludePatients, String.format("Excluded %s patients from report %s", excludedPatients.size(), reportId));
 
     // Create the ReportModel that will be returned
     ReportModel report = new ReportModel();

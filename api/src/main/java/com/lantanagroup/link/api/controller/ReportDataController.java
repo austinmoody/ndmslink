@@ -182,7 +182,7 @@ public class ReportDataController extends BaseController {
       for (String resourceIdentifier : resourcesToDelete.getResourceIdentifiers()) {
         try {
           fhirDataProvider.deleteResource(resourcesToDelete.getResourceType(), resourceIdentifier, true);
-          getFhirDataProvider().audit(request,
+          getFhirDataProvider().audit(task,
                   user.getJwt(),
                   FhirHelper.AuditEventTypes.Delete,
                   String.format("Resource of Type '%s' with Id of '%s' has been expunged.", resourcesToDelete.getResourceType(), resourceIdentifier));
@@ -249,7 +249,7 @@ public class ReportDataController extends BaseController {
     return ResponseEntity.ok(job);
   }
 
-  private void expungeData(LinkCredentials user, HttpServletRequest request, String taskId) {
+  private void expungeData(LinkCredentials user, String taskId) {
 
     logger.info("Data Expunge Started (Task ID: {})", taskId);
 
@@ -262,14 +262,14 @@ public class ReportDataController extends BaseController {
         throw new Exception(String.format("API Data Governance Not Configured (Task ID %s)", taskId));
       }
 
-      expungeCountByTypeAndRetentionAndPatientFilter(request,
+      expungeCountByTypeAndRetentionAndPatientFilter(task,
               user,
               dataGovernanceConfig.getExpungeChunkSize(),
               "List",
               dataGovernanceConfig.getCensusListRetention(),
               false);
 
-      expungeCountByTypeAndRetentionAndPatientFilter(request,
+      expungeCountByTypeAndRetentionAndPatientFilter(task,
               user,
               dataGovernanceConfig.getExpungeChunkSize(),
               "Bundle",
@@ -277,7 +277,7 @@ public class ReportDataController extends BaseController {
               true);
 
       // This to remove the "placeholder" Patient resources
-      expungeCountByTypeAndRetentionAndPatientFilter(request,
+      expungeCountByTypeAndRetentionAndPatientFilter(task,
               user,
               dataGovernanceConfig.getExpungeChunkSize(),
               "Patient",
@@ -286,7 +286,7 @@ public class ReportDataController extends BaseController {
 
       // Remove individual MeasureReport tied to Patient
       // Individual MeasureReport for patient will be tagged.  Others have no PHI.
-      expungeCountByTypeAndRetentionAndPatientFilter(request,
+      expungeCountByTypeAndRetentionAndPatientFilter(task,
               user,
               dataGovernanceConfig.getExpungeChunkSize(),
               "MeasureReport",
@@ -295,7 +295,7 @@ public class ReportDataController extends BaseController {
 
       // Loop uscore.patient-resource-types & other-resource-types and delete
       for (String resourceType : usCoreConfig.getPatientResourceTypes()) {
-        expungeCountByTypeAndRetentionAndPatientFilter(request,
+        expungeCountByTypeAndRetentionAndPatientFilter(task,
                 user,
                 dataGovernanceConfig.getExpungeChunkSize(),
                 resourceType,
@@ -304,7 +304,7 @@ public class ReportDataController extends BaseController {
       }
 
       for (USCoreOtherResourceTypeConfig otherResourceType : usCoreConfig.getOtherResourceTypes()) {
-        expungeCountByTypeAndRetentionAndPatientFilter(request,
+        expungeCountByTypeAndRetentionAndPatientFilter(task,
                 user,
                 dataGovernanceConfig.getExpungeChunkSize(),
                 otherResourceType.getResourceType(),
@@ -345,7 +345,7 @@ public class ReportDataController extends BaseController {
     fhirDataProvider.updateResource(task);
     Job job = new Job(task);
 
-    executor.submit(() -> expungeData(user, request, task.getId()));
+    executor.submit(() -> expungeData(user, task.getId()));
 
     return ResponseEntity.ok(job);
   }
@@ -368,7 +368,7 @@ public class ReportDataController extends BaseController {
     return rightNow.getTime();
   }
 
-  private void expungeCountByTypeAndRetentionAndPatientFilter(HttpServletRequest request, LinkCredentials user, Integer count, String resourceType, String retention, Boolean filterPatientTag) throws DatatypeConfigurationException {
+  private void expungeCountByTypeAndRetentionAndPatientFilter(Task jobTask, LinkCredentials user, Integer count, String resourceType, String retention, Boolean filterPatientTag) throws DatatypeConfigurationException {
     int bundleEntrySize = 1;
     int expunged = 0;
     Bundle bundle;
@@ -393,7 +393,7 @@ public class ReportDataController extends BaseController {
 
           expungeResourceById(entry.getResource().getIdElement().getIdPart(),
                   entry.getResource().getResourceType().toString(),
-                  request,
+                  jobTask,
                   user);
 
           expunged++;
@@ -409,11 +409,11 @@ public class ReportDataController extends BaseController {
 
   }
 
-  private void expungeResourceById(String id, String type, HttpServletRequest request, LinkCredentials user) {
+  private void expungeResourceById(String id, String type, Task jobTask, LinkCredentials user) {
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     try {
       fhirDataProvider.deleteResource(type, id, true);
-      getFhirDataProvider().audit(request,
+      getFhirDataProvider().audit(jobTask,
               user.getJwt(),
               FhirHelper.AuditEventTypes.Delete,
               String.format("Resource of Type '%s' with Id of '%s' has been expunged.", type, id));
@@ -546,7 +546,7 @@ public class ReportDataController extends BaseController {
       task.addNote(note);
 
       // TODO: Update audit to accept remoteAddress instead of request.  Ultimately that is all that FhirHelper pulls from request
-      //this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Initiating Query For Resources");
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Initiating Query For Resources");
 
       // Scoop the data for the patients and store it
       QueryConfig queryConfig = this.context.getBean(QueryConfig.class);

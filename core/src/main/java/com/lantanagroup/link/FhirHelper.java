@@ -32,8 +32,8 @@ public class FhirHelper {
   private static final String SUBJECT = "sub";
   //private static final String DOCUMENT_REFERENCE_VERSION_URL = "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-report-version";
 
-  public static void recordAuditEvent(HttpServletRequest request, FhirDataProvider fhirDataProvider, DecodedJWT jwt, AuditEventTypes type, String outcomeDescription) {
-    AuditEvent auditEvent = createAuditEvent(request, jwt, type, outcomeDescription);
+  public static void recordAuditEvent(Task jobTask, FhirDataProvider fhirDataProvider, DecodedJWT jwt, AuditEventTypes type, String outcomeDescription) {
+    AuditEvent auditEvent = createAuditEvent(jobTask, jwt, type, outcomeDescription);
 
     try {
       MethodOutcome outcome = fhirDataProvider.createOutcome(auditEvent);
@@ -44,7 +44,7 @@ public class FhirHelper {
     }
   }
 
-  public static AuditEvent createAuditEvent(HttpServletRequest request, DecodedJWT jwt, AuditEventTypes type, String outcomeDescription) {
+  public static AuditEvent createAuditEvent(Task jobTask, DecodedJWT jwt, AuditEventTypes type, String outcomeDescription) {
     AuditEvent auditEvent = new AuditEvent();
 
     switch (type) {
@@ -90,8 +90,9 @@ public class FhirHelper {
       agent.setAltId(jsonObject.get(SUBJECT).toString());
     }
 
-    String remoteAddress;
-    remoteAddress = getRemoteAddress(request);
+    String remoteAddress = "";
+    //remoteAddress = getRemoteAddress(request);
+
 
     if (remoteAddress != null) {
       agent.setNetwork(new AuditEvent.AuditEventAgentNetworkComponent().setAddress(remoteAddress));

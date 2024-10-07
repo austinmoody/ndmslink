@@ -9,10 +9,7 @@ import com.lantanagroup.link.config.api.ApiReportDefsConfig;
 import com.lantanagroup.link.config.api.ApiReportDefsUrlConfig;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
-import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.HumanName;
-import org.hl7.fhir.r4.model.MeasureReport;
-import org.hl7.fhir.r4.model.Resource;
+import org.hl7.fhir.r4.model.*;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -79,7 +76,10 @@ public class FhirHelperTests {
     when(decodedJWTTest.getPayload()).thenReturn("e30");
     when(fhirDataProviderTest.createOutcome(any())).thenReturn(outcomeTest);
 
-    FhirHelper.recordAuditEvent(httpServletRequestTest, fhirDataProviderTest, decodedJWTTest, FhirHelper.AuditEventTypes.Generate, "Testing String");
+    // TODO - create valid Task w/ remote address
+    Task jobTask = new Task();
+
+    FhirHelper.recordAuditEvent(jobTask, fhirDataProviderTest, decodedJWTTest, FhirHelper.AuditEventTypes.Generate, "Testing String");
   }
   
   @Test
