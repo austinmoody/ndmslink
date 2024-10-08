@@ -602,7 +602,4 @@ public class ReportDataController extends BaseController {
     }
   }
 
-  private void scoopData() {
-
-  }
 }

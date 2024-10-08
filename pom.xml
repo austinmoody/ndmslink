@@ -41,6 +41,7 @@
         <module>mhl</module>
         <module>tasks</module>
         <module>link-lambda</module>
+        <module>ndms</module>
     </modules>
 
     <dependencies>

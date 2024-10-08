@@ -21,4 +21,6 @@ public class ApiReportDefsBundleConfig {
      */
     private String reportAggregator;
 
+    private String measureGenerator;
+
 }

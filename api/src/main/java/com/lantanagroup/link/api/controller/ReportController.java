@@ -138,6 +138,12 @@ public class ReportController extends BaseController {
     }
   }
 
+  @PostMapping("/generate-report")
+  public ResponseEntity<Job> generateReport() {
+
+    return ResponseEntity.ok(new Job());
+  }
+
   @PostMapping("/$generate")
   public ResponseEntity<?> generateReport(@AuthenticationPrincipal LinkCredentials user,
                                           HttpServletRequest request,
@@ -355,20 +361,23 @@ public class ReportController extends BaseController {
         response.setMeasureHashId(ReportIdHelper.hash(measureContext.getBundleId()));
 
         String reportAggregatorClassName = FhirHelper.getReportAggregatorClassName(config, measureContext.getReportDefBundle());
-
         IReportAggregator reportAggregator = (IReportAggregator) context.getBean(Class.forName(reportAggregatorClassName));
 
-        ReportGenerator generator = new ReportGenerator(this.stopwatchManager, reportContext, measureContext, criteria, config, user, reportAggregator);
+        String measureGeneratorClassName = FhirHelper.getMeasureGeneratorClassName(config, measureContext.getReportDefBundle());
+        IMeasureGenerator measureGenerator = (IMeasureGenerator) context.getBean(Class.forName(measureGeneratorClassName));
+
+        //ReportGenerator generator = new ReportGenerator(this.stopwatchManager, reportContext, measureContext, criteria, config, user, reportAggregator);
 
         this.eventService.triggerEvent(EventTypes.BeforeMeasureEval, criteria, reportContext, measureContext);
 
-        generator.generate();
+        //generator.generate();
+        measureGenerator.generate(this.stopwatchManager, reportContext, measureContext, criteria, config, user, reportAggregator);
 
         this.eventService.triggerEvent(EventTypes.AfterMeasureEval, criteria, reportContext, measureContext);
 
         this.eventService.triggerEvent(EventTypes.BeforeReportStore, criteria, reportContext, measureContext);
 
-        generator.store();
+        measureGenerator.store(measureContext, reportContext);
 
         this.eventService.triggerEvent(EventTypes.AfterReportStore, criteria, reportContext, measureContext);
 

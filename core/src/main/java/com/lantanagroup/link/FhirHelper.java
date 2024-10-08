@@ -518,6 +518,25 @@ public class FhirHelper {
             });
   }
 
+  public static String getMeasureGeneratorClassName(ApiConfig config, Bundle reportDefBundle) {
+    String measureGeneratorClassName = null;
+
+    Optional<ApiReportDefsBundleConfig> apiReportDefsBundleConfig = config.getReportDefs().getBundles().stream().filter(bundleConfig -> {
+      String bundleId = bundleConfig.getBundleId();
+      return bundleId.equalsIgnoreCase(reportDefBundle.getIdElement().getIdPart());
+    }).findFirst();
+
+    if (apiReportDefsBundleConfig.isPresent() && !StringUtils.isEmpty(apiReportDefsBundleConfig.get().getMeasureGenerator())) {
+      measureGeneratorClassName = apiReportDefsBundleConfig.get().getMeasureGenerator();
+    } else {
+      throw new IllegalArgumentException("Could not find a measure generator class for report definition bundle " + reportDefBundle.getIdElement());
+    }
+
+    logger.info("Using generator {} for measure {}", measureGeneratorClassName, reportDefBundle.getId());
+
+    return measureGeneratorClassName;
+  }
+
   /**
    * Reads the configuration file and figures out what aggregator to instantiate for a given measure bundle
    *
