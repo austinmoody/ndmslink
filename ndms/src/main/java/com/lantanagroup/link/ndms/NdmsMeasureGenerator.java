@@ -1,12 +1,14 @@
 package com.lantanagroup.link.ndms;
 
 import com.lantanagroup.link.*;
+import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.auth.LinkCredentials;
 import com.lantanagroup.link.config.api.ApiConfig;
 import com.lantanagroup.link.model.ReportContext;
 import com.lantanagroup.link.model.ReportCriteria;
 import org.apache.commons.lang3.StringUtils;
-import org.hl7.fhir.r4.model.MeasureReport;
+import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -43,7 +45,27 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
                         MeasureReport patientMeasureReport = new MeasureReport();
                         try {
                             // TODO: create specific patient measure
-                            //patientMeasureReport = MeasureEvaluator.generateMeasureReport(stopwatchManager, criteria, reportContext, measureContext, config, patient);
+                            MeasureReport measureReport;
+                            String patientDataBundleId = ReportIdHelper.getPatientDataBundleId(reportContext.getMasterIdentifierValue(), patient.getId());
+
+                            String measureId = measureContext.getMeasure().getIdElement().getIdPart();
+
+                            // get patient bundle from the fhirserver
+                            FhirDataProvider fhirStoreProvider = new FhirDataProvider(config.getDataStore());
+                            IBaseResource patientBundle = fhirStoreProvider.getBundleById(patientDataBundleId);
+
+                            logger.info("Removing any non-Patient resource with the same ID as the Patient");
+                            ((Bundle) patientBundle).setEntry(((Bundle) patientBundle).getEntry().stream().filter(entry ->
+                                    (!entry.getResource().getIdElement().getIdPart().equals(patient.getId())
+                                            && !entry.getResource().getResourceType().toString().equals("Patient"))
+                                            || (entry.getResource().getIdElement().getIdPart().equals(patient.getId())
+                                            && entry.getResource().getResourceType().toString().equals("Patient"))).collect(Collectors.toList()));
+
+                            // Parse the Locations out of the Patient bundle and find active and map to bed type
+                            // create MeasureReport
+                            // TODO
+
+
                         } catch (Exception ex) {
                             logger.error(String.format("Issue generating patient measure report for %s, error %s", patient, ex.getMessage()));
                         }
