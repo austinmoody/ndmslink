@@ -25,6 +25,9 @@ import java.util.List;
 public class ApiConfig {
   private static final Logger logger = LoggerFactory.getLogger(ApiConfig.class);
 
+  //TODO: remove this when we have a better plan
+  private String nebraskaMedBedList;
+
   /**
    * <strong>api.validate-fhir-server</strong><br>Boolean for whether to check for metadata before request or not
    */
@@ -149,7 +152,7 @@ public class ApiConfig {
    */
   private boolean skipQuery = false;
 
-  public boolean ValidDataProcessor(String source, String type) {
+  public boolean validDataProcessor(String source, String type) {
     if (getDataProcessor() == null || getDataProcessor().get(source) == null || getDataProcessor().get(source).equals("")) {
       logger.error("Cannot find data processor for source '{}'", source);
       return false;

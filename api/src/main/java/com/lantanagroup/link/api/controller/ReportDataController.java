@@ -107,7 +107,7 @@ public class ReportDataController extends BaseController {
       uploadFile.setSource("generic");
     }
 
-    boolean validDataProcessorConfig = config.ValidDataProcessor(uploadFile.getSource(), uploadFile.getType());
+    boolean validDataProcessorConfig = config.validDataProcessor(uploadFile.getSource(), uploadFile.getType());
     if (!validDataProcessorConfig) {
       String errorMessage = "Data Processor configuration is invalid.  Check 'data-process' section of API configuration";
       logger.error(errorMessage);

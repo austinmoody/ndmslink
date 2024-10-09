@@ -7,14 +7,16 @@ import com.lantanagroup.link.config.api.ApiConfig;
 import com.lantanagroup.link.model.ReportContext;
 import com.lantanagroup.link.model.ReportCriteria;
 import org.apache.commons.lang3.StringUtils;
-import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.text.ParseException;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.stream.Collectors;
@@ -30,13 +32,22 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
                          ReportCriteria criteria,
                          ApiConfig config,
                          LinkCredentials user,
-                         IReportAggregator reportAggregator)  throws ParseException, ExecutionException, InterruptedException {
+                         IReportAggregator reportAggregator)  throws ParseException, ExecutionException, InterruptedException, IOException {
         logger.info("Patient list is : " + measureContext.getPatientsOfInterest().size());
         ForkJoinPool forkJoinPool = config.getMeasureEvaluationThreads() != null
                 ? new ForkJoinPool(config.getMeasureEvaluationThreads())
                 : ForkJoinPool.commonPool();
 
         try {
+
+            final Date startDate = Helper.parseFhirDate(criteria.getPeriodStart());
+            final Date endDate = Helper.parseFhirDate(criteria.getPeriodEnd());
+
+            // Read in Nebraska Med bed list
+            // TODO: Will revisit this is a bit of a mess to get initial Measures for comparison
+            String nebraskaMedCsv = Files.readString(Path.of(config.getNebraskaMedBedList()));
+            final List<NebraskaMedicalLocation> nebraskaMedLocations = NebraskaMedicalLocation.parseCsvData(nebraskaMedCsv);
+
             List<MeasureReport> patientMeasureReports = forkJoinPool.submit(() ->
                     measureContext.getPatientsOfInterest().parallelStream().filter(patient -> !StringUtils.isEmpty(patient.getId())).map(patient -> {
 
@@ -52,22 +63,49 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
 
                             // get patient bundle from the fhirserver
                             FhirDataProvider fhirStoreProvider = new FhirDataProvider(config.getDataStore());
-                            IBaseResource patientBundle = fhirStoreProvider.getBundleById(patientDataBundleId);
+                            Bundle patientBundle = fhirStoreProvider.getBundleById(patientDataBundleId);
 
-                            logger.info("Removing any non-Patient resource with the same ID as the Patient");
-                            ((Bundle) patientBundle).setEntry(((Bundle) patientBundle).getEntry().stream().filter(entry ->
-                                    (!entry.getResource().getIdElement().getIdPart().equals(patient.getId())
-                                            && !entry.getResource().getResourceType().toString().equals("Patient"))
-                                            || (entry.getResource().getIdElement().getIdPart().equals(patient.getId())
-                                            && entry.getResource().getResourceType().toString().equals("Patient"))).collect(Collectors.toList()));
+                            // Pull Location identifiers from Encounters if the Location has a period.start / period.end
+                            // that falls in range of the passed in start/end dates when generating the reports.
+                            List<String> relevantLocationIdentifiers = patientBundle.getEntry().stream()
+                                    .map(Bundle.BundleEntryComponent::getResource)
+                                    .filter(Encounter.class::isInstance)
+                                    .map(Encounter.class::cast)
+                                    .filter(encounter -> hasRelevantLocation(encounter, startDate, endDate))
+                                    .flatMap(encounter -> encounter.getLocation().stream())
+                                    .map(location -> location.getLocation().getReference())
+                                    .filter(Objects::nonNull)  // remove nulls
+                                    .filter(ref -> !ref.isEmpty())  // remove empty strings
+                                    .distinct()
+                                    .collect(Collectors.toList());
 
-                            // Parse the Locations out of the Patient bundle and find active and map to bed type
-                            // create MeasureReport
-                            // TODO
+                            // Pull relevant Location resources using the list if ID's generated in previous step.
+                            // Filter out any Location that has no aliases as those are used for finding the Nebraska
+                            // Med bed code.
+                            List<Location> relevantLocations = patientBundle.getEntry().stream()
+                                    .map(Bundle.BundleEntryComponent::getResource)
+                                    .filter(Location.class::isInstance)
+                                    .map(Location.class::cast)
+                                    .filter(location -> relevantLocationIdentifiers.contains("Location/" + location.getIdElement().getIdPart()))
+                                    .filter(location -> location.hasAlias() && !location.getAlias().isEmpty())
+                                    .collect(Collectors.toList());
+
+                            for (Location location : relevantLocations) {
+                                if (location.hasAlias()) {
+                                    List<String> aliases = location.getAlias().stream()
+                                            .map(StringType::getValue)
+                                            .collect(Collectors.toList());
+
+                                    Optional<NebraskaMedicalLocation> nebMedLocation = getNebraskaMedBedCode(nebraskaMedLocations, aliases);
+                                    nebMedLocation.ifPresent(nebraskaMedicalLocation -> logger.debug(nebraskaMedicalLocation.getNhsnHealthcareServiceLocationCode()));
+                                }
+                            }
+
+                            logger.debug("TODO");
 
 
                         } catch (Exception ex) {
-                            logger.error(String.format("Issue generating patient measure report for %s, error %s", patient, ex.getMessage()));
+                            logger.error("Issue generating patient measure report for {}, error {}", patient, ex.getMessage());
                         }
 
                         String measureReportId = ReportIdHelper.getPatientMeasureReportId(measureContext.getReportId(), patient.getId());
@@ -99,6 +137,43 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
     public void store(ReportContext.MeasureContext measureContext, ReportContext reportContext) {
         measureContext.getPatientReports().parallelStream().forEach(report -> reportContext.getFhirProvider().updateResource(report));
         reportContext.getFhirProvider().updateResource(measureContext.getMeasureReport());
+    }
+
+    private static boolean hasRelevantLocation(Encounter encounter, Date startDate, Date endDate) {
+        return encounter.getLocation().stream()
+                .anyMatch(location -> isLocationRelevant(location, startDate, endDate));
+    }
+
+    private static boolean isLocationRelevant(Encounter.EncounterLocationComponent location, Date startDate, Date endDate) {
+        if (location.getPeriod() == null) {
+            return false; // If no period is specified, consider it NOT relevant
+        }
+
+        Date locationStart = location.getPeriod().getStart();
+        Date locationEnd = location.getPeriod().getEnd();
+
+        // Period exists but both start/stop don't exist consider NOT relevant
+        if (locationStart == null && locationEnd == null) {
+            return false;
+        }
+
+        return (locationStart == null || !locationStart.after(startDate)) &&
+                (locationEnd == null || !locationEnd.before(endDate));
+    }
+
+    private Optional<NebraskaMedicalLocation> getNebraskaMedBedCode(List<NebraskaMedicalLocation> nebraskaMedLocations, List<String> aliases) {
+
+        List<NebraskaMedicalLocation> locationsByUnitLabel = nebraskaMedLocations.stream()
+                .filter(location -> aliases.contains(location.getUnitLabel()))
+                .collect(Collectors.toList());
+
+        if (!locationsByUnitLabel.isEmpty()) {
+            return locationsByUnitLabel.stream()
+                    .filter(location -> aliases.contains(location.getYourCode()))
+                    .findFirst();
+        }
+
+        return Optional.empty();
     }
 
 }
