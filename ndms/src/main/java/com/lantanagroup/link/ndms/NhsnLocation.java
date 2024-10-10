@@ -21,30 +21,32 @@ import java.util.regex.Pattern;
 
 @Getter
 @Setter
-public class NebraskaMedicalLocation {
-    private String orgId;
-    private String yourCode;
-    private String unitLabel;
+public class NhsnLocation {
+    private String organizationId;
+    private String code;
+    private String unit;
     private String cdcCode;
-    private String nhsnHealthcareServiceLocationCode;
-    private String cdcLocationLabel;
+    private String locationCode;
+    private String cdcLabel;
     private String status;
+    private String trac2es;
 
-    private static final Logger logger = LoggerFactory.getLogger(NebraskaMedicalLocation.class);
+    private static final Logger logger = LoggerFactory.getLogger(NhsnLocation.class);
 
-    public NebraskaMedicalLocation(String orgId, String yourCode, String unitLabel, String cdcCode,
-                                   String nhsnHealthcareServiceLocationCode, String cdcLocationLabel, String status) {
-        this.orgId = orgId;
-        this.yourCode = yourCode;
-        this.unitLabel = unitLabel;
+    public NhsnLocation(String organizationId, String code, String unit, String cdcCode,
+                        String locationCode, String cdcLabel, String status, String trac2es) {
+        this.organizationId = organizationId;
+        this.code = code;
+        this.unit = unit;
         this.cdcCode = cdcCode;
-        this.nhsnHealthcareServiceLocationCode = nhsnHealthcareServiceLocationCode;
-        this.cdcLocationLabel = cdcLocationLabel;
+        this.locationCode = locationCode;
+        this.cdcLabel = cdcLabel;
         this.status = status;
+        this.trac2es = trac2es;
     }
 
-    public static List<NebraskaMedicalLocation> parseCsvData(String csvData) {
-        List<NebraskaMedicalLocation> locations = new ArrayList<>();
+    public static List<NhsnLocation> parseCsvData(String csvData) {
+        List<NhsnLocation> locations = new ArrayList<>();
         String[] lines = csvData.split("\n");
 
         Pattern pattern = Pattern.compile(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
@@ -52,14 +54,14 @@ public class NebraskaMedicalLocation {
         // Assume there is a header so skip it
         for (int i = 1; i < lines.length; i++) {
             String line = lines[i];
-            String[] fields = pattern.split(line, -1);// line.split(",");
+            String[] fields = pattern.split(line, -1);
 
-            if (fields.length == 7) {
+            if (fields.length == 8) {
                 for (int j = 0; j < fields.length; j++) {
                     fields[j] = fields[j].replaceAll("^\"|\"$", "").trim();
                 }
-                NebraskaMedicalLocation location = new NebraskaMedicalLocation(
-                        fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6]
+                NhsnLocation location = new NhsnLocation(
+                        fields[0], fields[1], fields[2], fields[3], fields[4], fields[5], fields[6], fields[7]
                 );
                 locations.add(location);
             } else {

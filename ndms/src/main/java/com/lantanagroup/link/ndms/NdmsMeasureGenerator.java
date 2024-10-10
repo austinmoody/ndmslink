@@ -33,7 +33,7 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
                          ApiConfig config,
                          LinkCredentials user,
                          IReportAggregator reportAggregator)  throws ParseException, ExecutionException, InterruptedException, IOException {
-        logger.info("Patient list is : " + measureContext.getPatientsOfInterest().size());
+        logger.info("Patient list is : {}", measureContext.getPatientsOfInterest().size());
         ForkJoinPool forkJoinPool = config.getMeasureEvaluationThreads() != null
                 ? new ForkJoinPool(config.getMeasureEvaluationThreads())
                 : ForkJoinPool.commonPool();
@@ -43,23 +43,18 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
             final Date startDate = Helper.parseFhirDate(criteria.getPeriodStart());
             final Date endDate = Helper.parseFhirDate(criteria.getPeriodEnd());
 
-            // Read in Nebraska Med bed list
+            // Read in NHSN bed list
             // TODO: Will revisit this is a bit of a mess to get initial Measures for comparison
-            String nebraskaMedCsv = Files.readString(Path.of(config.getNebraskaMedBedList()));
-            final List<NebraskaMedicalLocation> nebraskaMedLocations = NebraskaMedicalLocation.parseCsvData(nebraskaMedCsv);
+            String nhsnCsvData = Files.readString(Path.of(config.getNhsnBedListCsvFile()));
+            final List<NhsnLocation> nhsnLocations = NhsnLocation.parseCsvData(nhsnCsvData);
 
             List<MeasureReport> patientMeasureReports = forkJoinPool.submit(() ->
                     measureContext.getPatientsOfInterest().parallelStream().filter(patient -> !StringUtils.isEmpty(patient.getId())).map(patient -> {
 
                         logger.info("Generating measure report for patient {}", patient);
-
                         MeasureReport patientMeasureReport = new MeasureReport();
                         try {
-                            // TODO: create specific patient measure
-                            MeasureReport measureReport;
                             String patientDataBundleId = ReportIdHelper.getPatientDataBundleId(reportContext.getMasterIdentifierValue(), patient.getId());
-
-                            String measureId = measureContext.getMeasure().getIdElement().getIdPart();
 
                             // get patient bundle from the fhirserver
                             FhirDataProvider fhirStoreProvider = new FhirDataProvider(config.getDataStore());
@@ -96,13 +91,39 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
                                             .map(StringType::getValue)
                                             .collect(Collectors.toList());
 
-                                    Optional<NebraskaMedicalLocation> nebMedLocation = getNebraskaMedBedCode(nebraskaMedLocations, aliases);
-                                    nebMedLocation.ifPresent(nebraskaMedicalLocation -> logger.debug(nebraskaMedicalLocation.getNhsnHealthcareServiceLocationCode()));
+                                    Optional<NhsnLocation> nhsnLocation = getNhsnLocation(nhsnLocations, aliases);
+                                    nhsnLocation.ifPresent(
+                                            loc -> {
+
+                                                // TODO: Clean this up, create method... something....
+                                                MeasureReport.MeasureReportGroupComponent group = new MeasureReport.MeasureReportGroupComponent();
+                                                Coding groupCoding = new Coding();
+                                                // TODO: Lookup display & system by trac2es code
+                                                groupCoding.setCode(loc.getTrac2es());
+                                                groupCoding.setDisplay("");
+                                                groupCoding.setSystem("urn:trac2es:bed-types");
+                                                CodeableConcept groupCodeableConcept = new CodeableConcept(groupCoding);
+                                                group.setCode(groupCodeableConcept);
+
+                                                MeasureReport.MeasureReportGroupPopulationComponent occupied = new MeasureReport.MeasureReportGroupPopulationComponent();
+                                                Coding occupiedCoding = new Coding();
+                                                // TODO: Some way to lookup TRAC2ES occupied type
+                                                occupiedCoding.setCode(String.format("numTot%sOcc",loc.getTrac2es()));
+                                                occupiedCoding.setSystem("https://hl7.org/fhir/uv/saner/CodeSystem/MeasuredValues");
+                                                occupiedCoding.setDisplay(String.format("Total %sTRAC2ES Occupied", loc.getTrac2es()));
+                                                CodeableConcept occupiedCodeableConcept = new CodeableConcept(occupiedCoding);
+                                                occupied.setCode(occupiedCodeableConcept);
+                                                occupied.setCount(1);
+
+                                                group.addPopulation(occupied);
+
+                                                patientMeasureReport.addGroup(group);
+
+                                                logger.debug(loc.getTrac2es());
+                                            }
+                                    );
                                 }
                             }
-
-                            logger.debug("TODO");
-
 
                         } catch (Exception ex) {
                             logger.error("Issue generating patient measure report for {}, error {}", patient, ex.getMessage());
@@ -135,7 +156,7 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
 
     @Override
     public void store(ReportContext.MeasureContext measureContext, ReportContext reportContext) {
-        measureContext.getPatientReports().parallelStream().forEach(report -> reportContext.getFhirProvider().updateResource(report));
+        measureContext.getPatientReports().forEach(report -> reportContext.getFhirProvider().updateResource(report));
         reportContext.getFhirProvider().updateResource(measureContext.getMeasureReport());
     }
 
@@ -161,15 +182,15 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
                 (locationEnd == null || !locationEnd.before(endDate));
     }
 
-    private Optional<NebraskaMedicalLocation> getNebraskaMedBedCode(List<NebraskaMedicalLocation> nebraskaMedLocations, List<String> aliases) {
+    private Optional<NhsnLocation> getNhsnLocation(List<NhsnLocation> nhsnLocations, List<String> aliases) {
 
-        List<NebraskaMedicalLocation> locationsByUnitLabel = nebraskaMedLocations.stream()
-                .filter(location -> aliases.contains(location.getUnitLabel()))
+        List<NhsnLocation> locationsByUnitLabel = nhsnLocations.stream()
+                .filter(location -> aliases.contains(location.getUnit()))
                 .collect(Collectors.toList());
 
         if (!locationsByUnitLabel.isEmpty()) {
             return locationsByUnitLabel.stream()
-                    .filter(location -> aliases.contains(location.getYourCode()))
+                    .filter(location -> aliases.contains(location.getCode()))
                     .findFirst();
         }
 

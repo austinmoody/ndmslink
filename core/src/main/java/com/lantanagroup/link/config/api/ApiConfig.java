@@ -26,7 +26,7 @@ public class ApiConfig {
   private static final Logger logger = LoggerFactory.getLogger(ApiConfig.class);
 
   //TODO: remove this when we have a better plan
-  private String nebraskaMedBedList;
+  private String nhsnBedListCsvFile;
 
   /**
    * <strong>api.validate-fhir-server</strong><br>Boolean for whether to check for metadata before request or not
