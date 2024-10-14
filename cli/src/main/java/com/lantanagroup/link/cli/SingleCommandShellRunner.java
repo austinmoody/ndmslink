@@ -23,7 +23,8 @@ public class SingleCommandShellRunner implements ApplicationRunner {
           "expunge-data",
           "manual-expunge",
           "generate-report",
-          "send-reports");
+          "send-reports",
+          "epic-totals-manual");
 
   public SingleCommandShellRunner(Shell shell, ConfigurableEnvironment environment) {
     this.shell = shell;

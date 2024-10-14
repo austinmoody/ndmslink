@@ -118,11 +118,12 @@ public class ApiConfig {
    */
   private ApiReportDefsConfig reportDefs;
 
+  private EpicTotalsData epicTotalsData;
+
   /**
    * <strong>api.measure-packages</strong><br>Configuration for multi measures supported by the system
    */
   private List<ApiMeasurePackage> measurePackages;
-
   /**
    * <strong>api.user</strong><br>Configuration related to the user that is responsible for running the installation of Link, such as timezone settings.
    */
