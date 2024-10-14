@@ -1,0 +1,156 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "NdmsMeasuredValues",
+  "text": {
+    "status": "generated",
+    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>TODO</p></div>"
+  },
+  "url": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/NdmsMeasuredValues",
+  "version": "1.0.0",
+  "caseSensitive": true,
+  "name": "NdmsMeasuredValues",
+  "title": "Measured Values in NDMS Project",
+  "status": "active",
+  "date": "2024-10-14T19:08:29+00:00",
+  "publisher": "Audacious Inquiry",
+  "contact": [
+    {
+      "name": "Austin Moody",
+      "telecom": [
+        {
+          "system": "email",
+          "value": "mailto:amoody@ainq.com"
+        }
+      ]
+    }
+  ],
+  "description": "A Code System for Populations in Measures for NDMS Project",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "numTotBeds",
+      "display": "All Hospital Beds",
+      "definition": "Total number of all Inpatient and outpatient beds, including all staffed,ICU, licensed, and overflow (surge) beds used for inpatients or outpatients"
+    },
+    {
+      "code": "numTotBedsOcc",
+      "display": "Hospital Beds Occupied",
+      "definition": "Total number of all Inpatient and outpatient beds that are occupied"
+    },
+    {
+      "code": "numTotBedsAvail",
+      "display": "Hospital Beds Available",
+      "definition": "Total number of all Inpatient and outpatient beds that are available"
+    },
+    {
+      "code": "numTotCC",
+      "display": "All Critical Care Beds",
+      "definition": "Total number of all Critical Care beds"
+    },
+    {
+      "code": "numOccCC",
+      "display": "Critical Care Beds Occupied",
+      "definition": "Total number of all Critical Care beds that are occupied"
+    },
+    {
+      "code": "numAvailCC",
+      "display": "Critical Care Beds Available",
+      "definition": "Total number of all Critical Care beds that are available"
+    },
+    {
+      "code": "numTotMMSS",
+      "display": "All Medical/Surgery Beds",
+      "definition": "Total number of all Medical/Surgery beds"
+    },
+    {
+      "code": "numOccMMSS",
+      "display": "Medical/Surgery Beds Occupied",
+      "definition": "Total number of all Medical/Surgery beds that are occupied"
+    },
+    {
+      "code": "numAvailMMSS",
+      "display": "Medical/Surgery Beds Available",
+      "definition": "Total number of all Medical/Surgery beds that are available"
+    },
+    {
+      "code": "numTotMP",
+      "display": "All Psychiatry Beds",
+      "definition": "Total number of all Psychiatry beds"
+    },
+    {
+      "code": "numOccMP",
+      "display": "Psychiatry Beds Occupied",
+      "definition": "Total number of all Psychiatry beds that are occupied"
+    },
+    {
+      "code": "numAvailMP",
+      "display": "Psychiatry Beds Available",
+      "definition": "Total number of all Psychiatry beds that are available"
+    },
+    {
+      "code": "numTotSBN",
+      "display": "All Burns Beds",
+      "definition": "Total number of all Burns beds"
+    },
+    {
+      "code": "numOccSBN",
+      "display": "Burns Beds Occupied",
+      "definition": "Total number of all Burns beds that are occupied"
+    },
+    {
+      "code": "numAvailSBN",
+      "display": "Burns Beds Available",
+      "definition": "Total number of all Burns beds that are available"
+    },
+    {
+      "code": "numTotMC",
+      "display": "All Pediatrics Beds",
+      "definition": "Total number of all Pediatrics beds"
+    },
+    {
+      "code": "numOccMC",
+      "display": "Pediatrics Beds Occupied",
+      "definition": "Total number of all Pediatrics beds that are occupied"
+    },
+    {
+      "code": "numAvailMC",
+      "display": "Pediatrics Beds Available",
+      "definition": "Total number of all Pediatrics beds that are available"
+    },
+    {
+      "code": "numTotPICU",
+      "display": "All Pediatric ICU Beds",
+      "definition": "Total number of all Pediatric ICU beds"
+    },
+    {
+      "code": "numOccPICU",
+      "display": "Pediatric ICU Beds Occupied",
+      "definition": "Total number of all Pediatric ICU beds that are occupied"
+    },
+    {
+      "code": "numAvailPICU",
+      "display": "Pediatric ICU Beds Available",
+      "definition": "Total number of all Pediatric ICU beds that are available"
+    },
+    {
+      "code": "numTotNPU",
+      "display": "All Negative pressure / isolation Beds",
+      "definition": "Total number of all Negative pressure / isolation beds"
+    },
+    {
+      "code": "numOccNPU",
+      "display": "Negative pressure / isolation Beds Occupied",
+      "definition": "Total number of all Negative pressure / isolation beds that are occupied"
+    },
+    {
+      "code": "numAvailNPU",
+      "display": "Negative pressure / isolation Beds Available",
+      "definition": "Total number of all Negative pressure / isolation beds that are available"
+    },
+    {
+      "code": "numOccNOMAP",
+      "display": "Non-Mapped Beds Occupied",
+      "definition": "Total number of all Non-Mapped beds that are occupied"
+    }
+  ]
+}

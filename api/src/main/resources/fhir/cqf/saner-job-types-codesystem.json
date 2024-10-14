@@ -1,0 +1,59 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "saner-job-types",
+  "text": {
+    "status": "generated",
+    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>TODO</p></div>"
+  },
+  "url": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/saner-job-types",
+  "version": "1.0.0",
+  "caseSensitive": true,
+  "name": "saner-job-types",
+  "title": "Saner Job Types for use in NDMS Project",
+  "status": "active",
+  "date": "2024-10-14T19:08:29+00:00",
+  "publisher": "Audacious Inquiry",
+  "contact": [
+    {
+      "name": "Austin Moody",
+      "telecom": [
+        {
+          "system": "email",
+          "value": "mailto:amoody@ainq.com"
+        }
+      ]
+    }
+  ],
+  "description": "A Code System for SANER Job Types for NDMS Project",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "expunge-data",
+      "display": "Expunge Data"
+    },
+    {
+      "code": "manual-expunge",
+      "display": "Manual Expunge"
+    },
+    {
+      "code": "refresh-patient-list",
+      "display": "Refresh Patient List"
+    },
+    {
+      "code": "generate-report",
+      "display": "Generate Report"
+    },
+    {
+      "code": "file-upload",
+      "display": "Upload Data File"
+    },
+    {
+      "code": "external-file-download",
+      "display": "File Downloaded From Source"
+    },
+    {
+      "code": "send-report",
+      "display": "Send Report"
+    }
+  ]
+}
