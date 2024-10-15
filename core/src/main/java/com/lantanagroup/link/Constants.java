@@ -45,7 +45,7 @@ public class Constants {
   public static final String LINK_VERSION_URL = "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/link-version";
   public static final String MEASURE_VERSION_URL = "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/measure-version";
   public static final String LinkUser = "link-user";
-  public static final String SANER_JOB_TYPE_SYSTEM = "https://thsa1.sanerproject.org:10443/fhir/ValueSet/saner-job-types";
+  public static final String SANER_JOB_TYPE_SYSTEM = "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/saner-job-types";
   public static final Coding EXPUNGE_TASK = new Coding().setCode("expunge-data").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Expunge Data");
   public static final Coding MANUAL_EXPUNGE = new Coding().setCode("manual-expunge").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Manual Expunge");
   public static final Coding REFRESH_PATIENT_LIST = new Coding().setCode("refresh-patient-list").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Refresh Patient List");
