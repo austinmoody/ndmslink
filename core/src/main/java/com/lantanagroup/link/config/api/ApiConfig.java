@@ -28,6 +28,9 @@ public class ApiConfig {
   //TODO: remove this when we have a better plan
   private String nhsnBedListCsvFile;
 
+  //REFACTOR - holds ID for CodeSystem that has TRAC2ES bed codes. Assumed to be on Evaluation Service
+  private String trac2esCodeSystem;
+
   /**
    * <strong>api.validate-fhir-server</strong><br>Boolean for whether to check for metadata before request or not
    */

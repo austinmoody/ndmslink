@@ -1,0 +1,93 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "Trac2esNdmsOccupiedMap",
+  "url": "https://thsa1.sanerproject.org:10443/fhir/ConceptMap/Trac2esNdmsOccupiedMap",
+  "version": "1.0.0",
+  "name": "Trac2esNdmsOccupiedMap",
+  "title": "TRAC2ES to NDMS Occupied CodeSystem Mapping",
+  "status": "active",
+  "experimental": false,
+  "date": "2024-10-15",
+  "publisher": "Audacious Inquiry",
+  "description": "Mapping between TRAC2ES bed types and corresponding NDMS occupied measured values",
+  "sourceUri": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/Trac2esBedTypes",
+  "targetUri": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/NdmsMeasuredValues",
+  "group": [
+    {
+      "source": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/Trac2esBedTypes",
+      "target": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/NdmsMeasuredValues",
+      "element": [
+        {
+          "code": "MM-SS",
+          "target": [
+            {
+              "code": "numOccMMSS",
+              "equivalence": "relatedto",
+              "comment": "Total Medical/Surgery Beds that are occupied"
+            }
+          ]
+        },
+        {
+          "code": "CC",
+          "target": [
+            {
+              "code": "numOccCC",
+              "equivalence": "relatedto",
+              "comment": "Total Critical Care Beds that are occupied"
+            }
+          ]
+        },
+        {
+          "code": "MP",
+          "target": [
+            {
+              "code": "numOccMP",
+              "equivalence": "relatedto",
+              "comment": "Total number of all Psychiatry beds that are occupied"
+            }
+          ]
+        },
+        {
+          "code": "SBN",
+          "target": [
+            {
+              "code": "numOccSBN",
+              "equivalence": "relatedto",
+              "comment": "Total number of all Burns beds that are occupied"
+            }
+          ]
+        },
+        {
+          "code": "MC",
+          "target": [
+            {
+              "code": "numOccMC",
+              "equivalence": "relatedto",
+              "comment": "Total number of all Pediatrics beds that are occupied"
+            }
+          ]
+        },
+        {
+          "code": "PICU",
+          "target": [
+            {
+              "code": "numOccPICU",
+              "equivalence": "relatedto",
+              "comment": "Total number of all Pediatric ICU beds that are occupied"
+            }
+          ]
+        },
+        {
+          "code": "NPU",
+          "target": [
+            {
+              "code": "numOccNPU",
+              "equivalence": "relatedto",
+              "comment": "Total number of all Negative pressure / isolation beds that are occupied"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

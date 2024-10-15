@@ -189,6 +189,10 @@ public class FhirDataProvider {
     return this.client.read().resource(Measure.class).withId(measureId).execute();
   }
 
+  public CodeSystem getCodeSystemById(String codeSystemId) {
+    return this.client.read().resource(CodeSystem.class).withId(codeSystemId).execute();
+  }
+
   public Task getTaskById(String taskId) {
     return this.client.read().resource(Task.class).withId(taskId).execute();
   }

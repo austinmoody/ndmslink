@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
 public class NdmsMeasureGenerator implements IMeasureGenerator {
     private static final Logger logger = LoggerFactory.getLogger(NdmsMeasureGenerator.class);
 
+    private CodeSystem trac2esCodeSystem = null;
+
     @Override
     public void generate(StopwatchManager stopwatchManager,
                          ReportContext reportContext,
@@ -95,31 +97,30 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
                                     nhsnLocation.ifPresent(
                                             loc -> {
 
-                                                // TODO: Clean this up, create method... something....
-                                                MeasureReport.MeasureReportGroupComponent group = new MeasureReport.MeasureReportGroupComponent();
-                                                Coding groupCoding = new Coding();
-                                                // TODO: Lookup display & system by trac2es code
-                                                groupCoding.setCode(loc.getTrac2es());
-                                                groupCoding.setDisplay("");
-                                                groupCoding.setSystem("urn:trac2es:bed-types");
-                                                CodeableConcept groupCodeableConcept = new CodeableConcept(groupCoding);
-                                                group.setCode(groupCodeableConcept);
+                                                // Lookup TRAC2ES Code
+                                                // TODO: !!! Right now if we do not have a NebMed to TRAC2ES Map then we do not include
+                                                //       Looking for feedback from NDMS re: this.  So this may change.
+                                                CodeableConcept groupCodeableConcept = getTrac2esCode(config.getEvaluationService(), config.getTrac2esCodeSystem(), loc.getTrac2es());
 
-                                                MeasureReport.MeasureReportGroupPopulationComponent occupied = new MeasureReport.MeasureReportGroupPopulationComponent();
-                                                Coding occupiedCoding = new Coding();
-                                                // TODO: Some way to lookup TRAC2ES occupied type
-                                                occupiedCoding.setCode(String.format("numTot%sOcc",loc.getTrac2es()));
-                                                occupiedCoding.setSystem("https://hl7.org/fhir/uv/saner/CodeSystem/MeasuredValues");
-                                                occupiedCoding.setDisplay(String.format("Total %sTRAC2ES Occupied", loc.getTrac2es()));
-                                                CodeableConcept occupiedCodeableConcept = new CodeableConcept(occupiedCoding);
-                                                occupied.setCode(occupiedCodeableConcept);
-                                                occupied.setCount(1);
+                                                if (groupCodeableConcept != null) {
+                                                    MeasureReport.MeasureReportGroupComponent group = new MeasureReport.MeasureReportGroupComponent();
+                                                    group.setCode(groupCodeableConcept);
 
-                                                group.addPopulation(occupied);
+                                                    MeasureReport.MeasureReportGroupPopulationComponent occupied = new MeasureReport.MeasureReportGroupPopulationComponent();
+                                                    Coding occupiedCoding = new Coding();
+                                                    // TODO: Some way to lookup TRAC2ES occupied type
+                                                    occupiedCoding.setCode(String.format("numTot%sOcc",loc.getTrac2es()));
+                                                    occupiedCoding.setSystem("https://hl7.org/fhir/uv/saner/CodeSystem/MeasuredValues");
+                                                    occupiedCoding.setDisplay(String.format("Total %sTRAC2ES Occupied", loc.getTrac2es()));
+                                                    CodeableConcept occupiedCodeableConcept = new CodeableConcept(occupiedCoding);
+                                                    occupied.setCode(occupiedCodeableConcept);
+                                                    occupied.setCount(1);
 
-                                                patientMeasureReport.addGroup(group);
+                                                    group.addPopulation(occupied);
 
-                                                logger.debug(loc.getTrac2es());
+                                                    patientMeasureReport.addGroup(group);
+
+                                                }
                                             }
                                     );
                                 }
@@ -195,6 +196,36 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
         }
 
         return Optional.empty();
+    }
+
+    private CodeableConcept getTrac2esCode(String evaluationServiceLocation, String codeSystemLocation, String trac2esCode) {
+
+        // Here we take the TRAC2ES code which we got from looking up the NDMS/BEL code
+        // And lookup the full Coding information from the configured TRAC2ES CodeSystem
+        // which we are going to assume is loaded on the CQF Evaluation server
+        // REFACTOR
+
+        // TODO - need a default "no map" concept.
+        CodeableConcept codeableConcept = null;
+
+        // Pull down the CodeSystem if necessary
+        if ((trac2esCodeSystem == null) || trac2esCodeSystem.isEmpty()) {
+            FhirDataProvider evaluationService = new FhirDataProvider(evaluationServiceLocation);
+            trac2esCodeSystem = evaluationService.getCodeSystemById(codeSystemLocation);
+        }
+
+        for (CodeSystem.ConceptDefinitionComponent concept : trac2esCodeSystem.getConcept()) {
+            if (concept.getCode().equals(trac2esCode)) {
+                Coding coding = new Coding();
+                coding.setCode(concept.getCode());
+                coding.setDisplay(concept.getDisplay());
+                coding.setSystem(trac2esCodeSystem.getUrl());
+                codeableConcept = new CodeableConcept(coding);
+                codeableConcept.addCoding(coding);
+            }
+        }
+
+        return codeableConcept;
     }
 
 }

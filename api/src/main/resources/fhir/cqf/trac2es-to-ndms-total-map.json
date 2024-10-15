@@ -1,0 +1,93 @@
+{
+  "resourceType": "ConceptMap",
+  "id": "Trac2esNdmsTotalMap",
+  "url": "https://thsa1.sanerproject.org:10443/fhir/ConceptMap/Trac2esNdmsTotalMap",
+  "version": "1.0.0",
+  "name": "Trac2esNdmsTotalMap",
+  "title": "TRAC2ES to NDMS Totals CodeSystem Mapping",
+  "status": "active",
+  "experimental": false,
+  "date": "2024-10-15",
+  "publisher": "Audacious Inquiry",
+  "description": "Mapping between TRAC2ES bed types and corresponding NDMS totals measured values",
+  "sourceUri": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/Trac2esBedTypes",
+  "targetUri": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/NdmsMeasuredValues",
+  "group": [
+    {
+      "source": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/Trac2esBedTypes",
+      "target": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/NdmsMeasuredValues",
+      "element": [
+        {
+          "code": "MM-SS",
+          "target": [
+            {
+              "code": "numTotMMSS",
+              "equivalence": "relatedto",
+              "comment": "Total Medical/Surgery Beds"
+            }
+          ]
+        },
+        {
+          "code": "CC",
+          "target": [
+            {
+              "code": "numTotCC",
+              "equivalence": "relatedto",
+              "comment": "Total Critical Care Beds"
+            }
+          ]
+        },
+        {
+          "code": "MP",
+          "target": [
+            {
+              "code": "numTotMP",
+              "equivalence": "relatedto",
+              "comment": "Total number of all Psychiatry beds"
+            }
+          ]
+        },
+        {
+          "code": "SBN",
+          "target": [
+            {
+              "code": "numTotSBN",
+              "equivalence": "relatedto",
+              "comment": "Total number of all Burns beds"
+            }
+          ]
+        },
+        {
+          "code": "MC",
+          "target": [
+            {
+              "code": "numTotMC",
+              "equivalence": "relatedto",
+              "comment": "Total number of all Pediatrics beds"
+            }
+          ]
+        },
+        {
+          "code": "PICU",
+          "target": [
+            {
+              "code": "numTotPICU",
+              "equivalence": "relatedto",
+              "comment": "Total number of all Pediatric ICU beds"
+            }
+          ]
+        },
+        {
+          "code": "NPU",
+          "target": [
+            {
+              "code": "numTotNPU",
+              "equivalence": "relatedto",
+              "comment": "Total number of all Negative pressure / isolation beds"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
