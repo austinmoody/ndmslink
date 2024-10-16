@@ -31,6 +31,10 @@ public class ApiConfig {
   //REFACTOR - holds ID for CodeSystem that has TRAC2ES bed codes. Assumed to be on Evaluation Service
   private String trac2esCodeSystem;
 
+  //REFACTOR: ID's for ConceptMap's used to map Group-level TRAC2ES codes to Occupied, Available, Totals
+  // Population-level codes.
+  private String trac2esNdmsConceptMap;
+
   /**
    * <strong>api.validate-fhir-server</strong><br>Boolean for whether to check for metadata before request or not
    */

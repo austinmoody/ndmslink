@@ -26,6 +26,7 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
     private static final Logger logger = LoggerFactory.getLogger(NdmsMeasureGenerator.class);
 
     private CodeSystem trac2esCodeSystem = null;
+    private ConceptMap trac2esNdmsConceptMap = null;
 
     @Override
     public void generate(StopwatchManager stopwatchManager,
@@ -100,20 +101,15 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
                                                 // Lookup TRAC2ES Code
                                                 // TODO: !!! Right now if we do not have a NebMed to TRAC2ES Map then we do not include
                                                 //       Looking for feedback from NDMS re: this.  So this may change.
-                                                CodeableConcept groupCodeableConcept = getTrac2esCode(config.getEvaluationService(), config.getTrac2esCodeSystem(), loc.getTrac2es());
+                                                CodeableConcept groupCodeableConcept = getTrac2esCodeableConcept(config.getEvaluationService(), config.getTrac2esCodeSystem(), loc.getTrac2es());
 
                                                 if (groupCodeableConcept != null) {
                                                     MeasureReport.MeasureReportGroupComponent group = new MeasureReport.MeasureReportGroupComponent();
                                                     group.setCode(groupCodeableConcept);
 
                                                     MeasureReport.MeasureReportGroupPopulationComponent occupied = new MeasureReport.MeasureReportGroupPopulationComponent();
-                                                    Coding occupiedCoding = new Coding();
-                                                    // TODO: Some way to lookup TRAC2ES occupied type
-                                                    occupiedCoding.setCode(String.format("numTot%sOcc",loc.getTrac2es()));
-                                                    occupiedCoding.setSystem("https://hl7.org/fhir/uv/saner/CodeSystem/MeasuredValues");
-                                                    occupiedCoding.setDisplay(String.format("Total %sTRAC2ES Occupied", loc.getTrac2es()));
-                                                    CodeableConcept occupiedCodeableConcept = new CodeableConcept(occupiedCoding);
-                                                    occupied.setCode(occupiedCodeableConcept);
+                                                    CodeableConcept populationOccupiedCodeableConcept = getOccPopulationCodeByTrac2es(config.getEvaluationService(), config.getTrac2esNdmsConceptMap(), loc.getTrac2es());
+                                                    occupied.setCode(populationOccupiedCodeableConcept);
                                                     occupied.setCount(1);
 
                                                     group.addPopulation(occupied);
@@ -198,7 +194,44 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
         return Optional.empty();
     }
 
-    private CodeableConcept getTrac2esCode(String evaluationServiceLocation, String codeSystemLocation, String trac2esCode) {
+    private CodeableConcept getOccPopulationCodeByTrac2es(String evaluationServiceLocation, String conceptMapLocation, String trac2esCode) {
+
+        // Here we are given a TRAC2ES code (which is being used at the Group level)
+        // We use that to look up via ConceptMap which Population level Occupied
+        // code to use
+
+        // TODO - need a default "no map" concept.
+        CodeableConcept codeableConcept = null;
+
+        // Pull down the configured ConceptMap if necessary
+        if ((trac2esNdmsConceptMap == null) || trac2esNdmsConceptMap.isEmpty()) {
+            FhirDataProvider evaluationService = new FhirDataProvider(evaluationServiceLocation);
+            trac2esNdmsConceptMap = evaluationService.getConceptMapById(conceptMapLocation);
+        }
+
+        // Loop groups, find the one where the element w/ extension.url = urn:trac2es:ndms:grouptype and extension.valueCode = occupied
+        for (ConceptMap.ConceptMapGroupComponent group : trac2esNdmsConceptMap.getGroup()) {
+            Extension extension = group.getExtensionByUrl("urn:trac2es:ndms:grouptype");
+            if ((extension != null) && extension.getValue().toString().equals("occupied") ) {
+                // Found the right group, loop elements until we find TRAC2ES code
+                for (ConceptMap.SourceElementComponent element : group.getElement()) {
+                    if (element.getCode().equals(trac2esCode)) {
+                        Coding coding = new Coding();
+                        // REFACTOR: Assuming only 1 target per element
+                        coding.setCode(element.getTargetFirstRep().getCode());
+                        coding.setDisplay(element.getTargetFirstRep().getDisplay());
+                        coding.setSystem(trac2esCodeSystem.getUrl());
+                        codeableConcept = new CodeableConcept(coding);
+                        codeableConcept.addCoding(coding);
+                    }
+                }
+            }
+        }
+
+        return codeableConcept;
+    }
+
+    private CodeableConcept getTrac2esCodeableConcept(String evaluationServiceLocation, String codeSystemLocation, String trac2esCode) {
 
         // Here we take the TRAC2ES code which we got from looking up the NDMS/BEL code
         // And lookup the full Coding information from the configured TRAC2ES CodeSystem

@@ -193,6 +193,10 @@ public class FhirDataProvider {
     return this.client.read().resource(CodeSystem.class).withId(codeSystemId).execute();
   }
 
+  public ConceptMap getConceptMapById(String conceptMapId) {
+    return this.client.read().resource(ConceptMap.class).withId(conceptMapId).execute();
+  }
+
   public Task getTaskById(String taskId) {
     return this.client.read().resource(Task.class).withId(taskId).execute();
   }
