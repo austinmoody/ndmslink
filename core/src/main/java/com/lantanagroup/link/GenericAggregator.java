@@ -65,7 +65,7 @@ public abstract class GenericAggregator implements IReportAggregator {
 
 
   @Override
-  public MeasureReport generate(ReportCriteria criteria, ReportContext reportContext, ReportContext.MeasureContext measureContext) throws ParseException {
+  public MeasureReport generate(ReportCriteria criteria, ReportContext reportContext, ReportContext.MeasureContext measureContext, ApiConfig apiConfig) throws ParseException {
     // Create the master measure report
     MeasureReport masterMeasureReport = new MeasureReport();
     masterMeasureReport.setId(measureContext.getReportId());

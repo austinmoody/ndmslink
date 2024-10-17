@@ -25,7 +25,7 @@ public class ThsaMeasureGenerator  implements IMeasureGenerator {
                          ReportCriteria criteria,
                          ApiConfig config,
                          LinkCredentials user,
-                         IReportAggregator reportAggregator) throws ParseException, ExecutionException, InterruptedException {
+                         IReportAggregator reportAggregator) throws ParseException, ExecutionException, InterruptedException, Exception {
         if (config.getEvaluationService() == null) {
             throw new IllegalStateException("api.evaluation-service has not been configured");
         }
@@ -67,7 +67,7 @@ public class ThsaMeasureGenerator  implements IMeasureGenerator {
                 forkJoinPool.shutdown();
             }
         }
-        MeasureReport masterMeasureReport = reportAggregator.generate(criteria, reportContext, measureContext);
+        MeasureReport masterMeasureReport = reportAggregator.generate(criteria, reportContext, measureContext, config);
         measureContext.setMeasureReport(masterMeasureReport);
 
     }

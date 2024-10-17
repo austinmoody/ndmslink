@@ -10,6 +10,6 @@ import java.text.ParseException;
 import java.util.concurrent.ExecutionException;
 
 public interface IMeasureGenerator {
-    void generate(StopwatchManager stopwatchManager, ReportContext reportContext, ReportContext.MeasureContext measureContext, ReportCriteria criteria, ApiConfig config, LinkCredentials user, IReportAggregator reportAggregator) throws ParseException, ExecutionException, InterruptedException, IOException;
+    void generate(StopwatchManager stopwatchManager, ReportContext reportContext, ReportContext.MeasureContext measureContext, ReportCriteria criteria, ApiConfig config, LinkCredentials user, IReportAggregator reportAggregator) throws ParseException, ExecutionException, InterruptedException, IOException, Exception;
     void store(ReportContext.MeasureContext measureContext, ReportContext reportContext);
 }

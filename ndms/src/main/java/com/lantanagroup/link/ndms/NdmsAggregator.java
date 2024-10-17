@@ -1,7 +1,10 @@
 package com.lantanagroup.link.ndms;
 
+import com.lantanagroup.link.FhirDataProvider;
 import com.lantanagroup.link.Helper;
 import com.lantanagroup.link.IReportAggregator;
+import com.lantanagroup.link.config.api.ApiConfig;
+import com.lantanagroup.link.config.api.EpicTotalsDataBundleConfig;
 import com.lantanagroup.link.model.ReportContext;
 import com.lantanagroup.link.model.ReportCriteria;
 import org.hl7.fhir.r4.model.CodeableConcept;
@@ -13,11 +16,20 @@ import org.springframework.stereotype.Component;
 import java.text.ParseException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+
+import com.lantanagroup.link.ndms.NdmsConstants;
 
 @Component
 public class NdmsAggregator implements IReportAggregator {
+
     @Override
-    public MeasureReport generate(ReportCriteria criteria, ReportContext reportContext, ReportContext.MeasureContext measureContext) throws ParseException {
+    public MeasureReport generate(ReportCriteria criteria, ReportContext reportContext, ReportContext.MeasureContext measureContext, ApiConfig apiConfig) throws ParseException, ExecutionException {
+
+        MeasureReport totalsMeasure = loadTotalsMeasureReport(apiConfig, measureContext.getBundleId());
+        NdmsUtility ndmsUtility = new NdmsUtility();
+
         // Create the master measure report
         MeasureReport masterMeasureReport = new MeasureReport();
         masterMeasureReport.setId(measureContext.getReportId());
@@ -51,24 +63,113 @@ public class NdmsAggregator implements IReportAggregator {
             }
         }
 
-        // Loop the Bed Tally structure
-        // Create a Group in the master MeasureReport for each "type" of bed.
-        // Add a population to the group for each tally type (occupied, etc...)
-        bedTypeTally.forEach((bedTallyKey, bedTallyTotal) -> {
+        // Loop the Totals report we have pulled from storage.  This has the "totals" for the facility and for each Bed Type.
+        // For each group there, add the "occupied" population from the tally above
+        // For each group there, add the "available" population by calculation from the total and the occupied
+        int overallOccupied = 0;
+        for (MeasureReport.MeasureReportGroupComponent totalsGroup: totalsMeasure.getGroup()) {
 
-            MeasureReport.MeasureReportGroupComponent group = new MeasureReport.MeasureReportGroupComponent();
-            group.setCode(new CodeableConcept(bedTallyKey.getBedType()));
+            // REFACTOR: Remove 'Beds' hardcode
+            if (totalsGroup.getCode().getCodingFirstRep().getCode().equals("Beds")) {
+                // Beds = the "overall" total of beds for the facility.  We'll add
+                // this section after the rest of the compilation.
+                break;
+            }
 
-            MeasureReport.MeasureReportGroupPopulationComponent occupied = new MeasureReport.MeasureReportGroupPopulationComponent();
-            occupied.setCode(new CodeableConcept(bedTallyKey.getTallyType()));
-            occupied.setCount(bedTallyTotal);
+            // For Available Calcuation
+            // Get the totals.  We'll subtract occupied from it
+            // REFACTOR: Assuming there is only 1 population for the Group
+            int availableCount = totalsGroup.getPopulationFirstRep().getCount();
+            int occupiedCount = 0;
 
-            group.addPopulation(occupied);
+            // Find this Group code in bedTypeTally and add that occupied population
+            MeasureReport.MeasureReportGroupPopulationComponent occupied = null;
+            for (Map.Entry<BedTallyKey, Integer> entry : bedTypeTally.entrySet()) {
+                BedTallyKey key = entry.getKey();
 
-            masterMeasureReport.addGroup(group);
+                if (
+                        // REFACTOR: Assuming totals group only has 1 code
+                        (key.getBedType().getCode().equals(totalsGroup.getCode().getCodingFirstRep().getCode())) &&
+                                (key.getBedType().getSystem().equals(totalsGroup.getCode().getCodingFirstRep().getSystem()))
+                ) {
+                    // We have been able to aggregate occupied beds for this TRAC2ES Bed Type
+                    occupied = new MeasureReport.MeasureReportGroupPopulationComponent();
+                    occupied.setCode(new CodeableConcept(key.getTallyType()));
+                    occupied.setCount(entry.getValue());
+                    occupiedCount = occupied.getCount();
+                    totalsGroup.getPopulation().add(occupied);
+                }
+            }
+
+            if (occupied == null) {
+                // We didn't find any occupied beds for this "type".  So we still
+                // need to add the population group for it with total = 0
+                occupied = new MeasureReport.MeasureReportGroupPopulationComponent();
+                // REFACTOR: Assuming totals group only has 1 code
+                CodeableConcept populationOccupiedCodeableConcept = ndmsUtility.getOccPopulationCodeByTrac2es(apiConfig.getEvaluationService(), apiConfig.getTrac2esNdmsConceptMap(), totalsGroup.getCode().getCodingFirstRep().getCode());
+                occupied.setCode(populationOccupiedCodeableConcept);
+                occupied.setCount(occupiedCount);
+                totalsGroup.getPopulation().add(occupied);
+            }
+
+            // Lookup the available population code via ConceptMap using TRAC2ES code from Total's Group Code
+            availableCount -= occupiedCount;
+            CodeableConcept populationAvailCodeableConcept = ndmsUtility.getAvailPopulationCodeByTrac2es(apiConfig.getEvaluationService(), apiConfig.getTrac2esNdmsConceptMap(), totalsGroup.getCode().getCodingFirstRep().getCode());
+            MeasureReport.MeasureReportGroupPopulationComponent available = new MeasureReport.MeasureReportGroupPopulationComponent();
+            available.setCode(populationAvailCodeableConcept);
+            available.setCount(availableCount);
+            totalsGroup.getPopulation().add(available);
+
+            masterMeasureReport.addGroup(totalsGroup);
+
+            overallOccupied += occupiedCount;
+        }
+
+        // Now we need to add the "overall" totals
+        int finalOverallOccupied = overallOccupied;
+        totalsMeasure.getGroup().stream().filter(
+                grp -> grp.getCode().getCodingFirstRep().getCode().equals("Beds")
+        ).findFirst().ifPresent(grp -> {
+
+            // Calculate overall available
+            // REFACTOR: Assuming population only has 1 group
+            int overallAvailable = grp.getPopulationFirstRep().getCount() - finalOverallOccupied;
+
+            MeasureReport.MeasureReportGroupPopulationComponent occupiedPopulation = new MeasureReport.MeasureReportGroupPopulationComponent();
+            CodeableConcept occupiedCodeableConcept = new CodeableConcept(NdmsConstants.NDMS_OVERALL_OCC_CODE);
+            occupiedPopulation.setCode(occupiedCodeableConcept);
+            occupiedPopulation.setCount(finalOverallOccupied);
+            grp.addPopulation(occupiedPopulation);
+
+            MeasureReport.MeasureReportGroupPopulationComponent availPopulation = new MeasureReport.MeasureReportGroupPopulationComponent();
+            CodeableConcept availCodeableConcept = new CodeableConcept(NdmsConstants.NDMS_OVERALL_AVAIL_CODE);
+            availPopulation.setCode(availCodeableConcept);
+            availPopulation.setCount(overallAvailable);
+            grp.addPopulation(availPopulation);
+
+            masterMeasureReport.addGroup(grp);
         });
 
-
         return masterMeasureReport;
+    }
+
+    private MeasureReport loadTotalsMeasureReport(ApiConfig apiConfig, String bundleId) throws ExecutionException {
+        FhirDataProvider dataStore = new FhirDataProvider(apiConfig.getDataStore());
+
+        Optional<EpicTotalsDataBundleConfig> epicTotalsData =
+        apiConfig.getEpicTotalsData()
+                .getBundles()
+                .stream()
+                .filter(
+                        bundle -> bundle.getBundleId().equals(bundleId)
+                )
+                .findFirst();
+
+        if (epicTotalsData.isPresent()) {
+            return dataStore.getMeasureReportById(epicTotalsData.get().getTotalsReportId());
+        } else {
+            throw new ExecutionException(String.format("EPIC Totals Report for %s not found", bundleId), new Throwable());
+        }
+
     }
 }

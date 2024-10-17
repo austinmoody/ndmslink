@@ -1242,7 +1242,7 @@ public class ReportController extends BaseController {
 
     String reportAggregatorClassName = FhirHelper.getReportAggregatorClassName(config, measureBundle);
     IReportAggregator reportAggregator = (IReportAggregator) context.getBean(Class.forName(reportAggregatorClassName));
-    MeasureReport updatedMeasureReport = reportAggregator.generate(criteria, reportContext, measureContext);
+    MeasureReport updatedMeasureReport = reportAggregator.generate(criteria, reportContext, measureContext, config);
 
     updatedMeasureReport.setId(reportId);
     updatedMeasureReport.setExtension(measureReport.getExtension());    // Copy extensions from the original report before overwriting
