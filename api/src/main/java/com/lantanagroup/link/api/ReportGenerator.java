@@ -43,7 +43,7 @@ public class ReportGenerator {
   /**
    * This method accepts a list of patients and generates an individual measure report for each patient. Then agregates all the individual reports into a master measure report.
    */
-  public void generate() throws ParseException, ExecutionException, InterruptedException {
+  public void generate() throws ParseException, ExecutionException, InterruptedException, Exception {
     if (this.config.getEvaluationService() == null) {
       throw new IllegalStateException("api.evaluation-service has not been configured");
     }
@@ -83,7 +83,7 @@ public class ReportGenerator {
         forkJoinPool.shutdown();
       }
     }
-    MeasureReport masterMeasureReport = reportAggregator.generate(criteria, reportContext, measureContext);
+    MeasureReport masterMeasureReport = reportAggregator.generate(criteria, reportContext, measureContext, config);
     measureContext.setMeasureReport(masterMeasureReport);
   }
 

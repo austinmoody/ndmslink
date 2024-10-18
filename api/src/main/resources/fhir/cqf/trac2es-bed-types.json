@@ -1,0 +1,66 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "Trac2esBedTypes",
+  "text": {
+    "status": "generated",
+    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><p>TODO</p></div>"
+  },
+  "url": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/Trac2esBedTypes",
+  "version": "1.0.0",
+  "caseSensitive": true,
+  "name": "Trac2esBedTypes",
+  "title": "TRAC2ES Bed Types for NDMS Project",
+  "status": "active",
+  "date": "2024-10-14T19:08:29+00:00",
+  "publisher": "Audacious Inquiry",
+  "contact": [
+    {
+      "name": "Austin Moody",
+      "telecom": [
+        {
+          "system": "email",
+          "value": "mailto:amoody@ainq.com"
+        }
+      ]
+    }
+  ],
+  "description": "A Code System for TRAC2ES Bed Types for NDMS Project",
+  "content": "complete",
+  "concept": [
+    {
+      "code": "CC",
+      "display": "Critical Care",
+      "definition": "Adult patients requiring sophisticated intervention to restore or maintain life processes to their dynamic quilibrium. This involves the requirement to provide immediate and/or continuous attention and monitoring using specialized facilities, equipment, and personnel. Critical care beds are generally defined as those in licensed intensive care units."
+    },
+    {
+      "code": "MM-SS",
+      "display": "Medical/Surgery",
+      "definition": "Patients having, or suspected of having, medical illness or disorders, as well as patients having, or suspected of having, diseases or injuries normally treated by surgery, not coming within the purview of a more specific medical specialty. Medical/surgical beds are generally defined as those licensed, certified, or otherwise authorized, with adequate space, equipment, medical materiel and ancillary support services, and staff to operate under normal circumstances. Excluded are transient patient beds, bassinets, incubators, labor beds, and recovery beds."
+    },
+    {
+      "code": "MP",
+      "display": "Psychiatry",
+      "definition": "Patients who require specialized psychiatric care in a medical treatment facility, including patients with disorders defined by the American Psychiatric Association as severe mental illness (schizophrenia, schizoaffective disorder, bipolar disorder, major depression, panic disorder, obsessive-compulsive disorder, or autism). Psychiatric beds are generally defined as those supported by a licensed psychiatrist, or a licensed registered nurse, social worker, psychologist or professional counselor when those services are part of a treatment plan authorized by a licensed psychiatrist."
+    },
+    {
+      "code": "SBN",
+      "display": "Burns",
+      "definition": "Patients having burn injuries meeting the American Burn Association’s (ABA) burn unit referral criteria, including (but not limited to) partial thickness burns of 10% or more of the total body surface; all patients with third-degree burns of 10% or more of the total body surface; or patients with significant burns involving the face, hands, feet, genitalia, perineum or major joints. Burn beds are generally defined as those associated with burn centers on the joint ABA and American College of Surgeons verification list."
+    },
+    {
+      "code": "MC",
+      "display": "Pediatrics",
+      "definition": "Patients having, or suspected of having, diseases or injuries requiring the services of pediatric health care providers. Pediatric beds are generally defined as those supported by a licensed pediatrician."
+    },
+    {
+      "code": "PICU",
+      "display": "Pediatric ICU",
+      "definition": "PICU patients are those critically ill or injured, including those requiring ventilator support, aged 17 years or younger. PICU beds are generally defined as those that can support critically ill or injured patients, including those requiring ventilator support, aged 17 years or younger."
+    },
+    {
+      "code": "NPU",
+      "display": "Negative pressure / isolation",
+      "definition": "NPU patients are those requiring a separate room or area provided with negative airflow and respiratory isolation. NPU beds are generally defined as those providing negative airflow and respiratory isolation."
+    }
+  ]
+}

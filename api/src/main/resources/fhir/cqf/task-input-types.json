@@ -1,0 +1,22 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "task-input-types",
+  "url": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/task-input-types",
+  "version": "1.0.0",
+  "name": "TaskInputTypes",
+  "title": "Task Input Types",
+  "status": "active",
+  "experimental": false,
+  "date": "2024-10-05",
+  "publisher": "SANER Project",
+  "description": "Codes for various types of inputs that can be associated with a Task resource",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "remote-address",
+      "display": "Remote Address",
+      "definition": "The IP address or hostname of the client that initiated the task"
+    }
+    ]
+}

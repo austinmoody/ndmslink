@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.gson.*;
 import com.lantanagroup.link.config.api.ApiConfig;
 import com.lantanagroup.link.config.api.ApiReportDefsBundleConfig;
+import com.lantanagroup.link.helpers.RemoteAddressHelper;
 import com.lantanagroup.link.model.PatientReportModel;
 import com.lantanagroup.link.serialize.FhirJsonDeserializer;
 import com.lantanagroup.link.serialize.FhirJsonSerializer;
@@ -32,8 +33,8 @@ public class FhirHelper {
   private static final String SUBJECT = "sub";
   //private static final String DOCUMENT_REFERENCE_VERSION_URL = "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-report-version";
 
-  public static void recordAuditEvent(HttpServletRequest request, FhirDataProvider fhirDataProvider, DecodedJWT jwt, AuditEventTypes type, String outcomeDescription) {
-    AuditEvent auditEvent = createAuditEvent(request, jwt, type, outcomeDescription);
+  public static void recordAuditEvent(Task jobTask, FhirDataProvider fhirDataProvider, DecodedJWT jwt, AuditEventTypes type, String outcomeDescription) {
+    AuditEvent auditEvent = createAuditEvent(jobTask, jwt, type, outcomeDescription);
 
     try {
       MethodOutcome outcome = fhirDataProvider.createOutcome(auditEvent);
@@ -44,7 +45,7 @@ public class FhirHelper {
     }
   }
 
-  public static AuditEvent createAuditEvent(HttpServletRequest request, DecodedJWT jwt, AuditEventTypes type, String outcomeDescription) {
+  public static AuditEvent createAuditEvent(Task jobTask, DecodedJWT jwt, AuditEventTypes type, String outcomeDescription) {
     AuditEvent auditEvent = new AuditEvent();
 
     switch (type) {
@@ -90,8 +91,7 @@ public class FhirHelper {
       agent.setAltId(jsonObject.get(SUBJECT).toString());
     }
 
-    String remoteAddress;
-    remoteAddress = getRemoteAddress(request);
+    String remoteAddress = RemoteAddressHelper.getRemoteAddressFromTask(jobTask);
 
     if (remoteAddress != null) {
       agent.setNetwork(new AuditEvent.AuditEventAgentNetworkComponent().setAddress(remoteAddress));
@@ -516,6 +516,25 @@ public class FhirHelper {
                 ex.printStackTrace();
               }
             });
+  }
+
+  public static String getMeasureGeneratorClassName(ApiConfig config, Bundle reportDefBundle) {
+    String measureGeneratorClassName = null;
+
+    Optional<ApiReportDefsBundleConfig> apiReportDefsBundleConfig = config.getReportDefs().getBundles().stream().filter(bundleConfig -> {
+      String bundleId = bundleConfig.getBundleId();
+      return bundleId.equalsIgnoreCase(reportDefBundle.getIdElement().getIdPart());
+    }).findFirst();
+
+    if (apiReportDefsBundleConfig.isPresent() && !StringUtils.isEmpty(apiReportDefsBundleConfig.get().getMeasureGenerator())) {
+      measureGeneratorClassName = apiReportDefsBundleConfig.get().getMeasureGenerator();
+    } else {
+      throw new IllegalArgumentException("Could not find a measure generator class for report definition bundle " + reportDefBundle.getIdElement());
+    }
+
+    logger.info("Using generator {} for measure {}", measureGeneratorClassName, reportDefBundle.getId());
+
+    return measureGeneratorClassName;
   }
 
   /**

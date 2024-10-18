@@ -25,6 +25,16 @@ import java.util.List;
 public class ApiConfig {
   private static final Logger logger = LoggerFactory.getLogger(ApiConfig.class);
 
+  //TODO: remove this when we have a better plan
+  private String nhsnBedListCsvFile;
+
+  //REFACTOR - holds ID for CodeSystem that has TRAC2ES bed codes. Assumed to be on Evaluation Service
+  private String trac2esCodeSystem;
+
+  //REFACTOR: ID's for ConceptMap's used to map Group-level TRAC2ES codes to Occupied, Available, Totals
+  // Population-level codes.
+  private String trac2esNdmsConceptMap;
+
   /**
    * <strong>api.validate-fhir-server</strong><br>Boolean for whether to check for metadata before request or not
    */
@@ -115,11 +125,12 @@ public class ApiConfig {
    */
   private ApiReportDefsConfig reportDefs;
 
+  private EpicTotalsData epicTotalsData;
+
   /**
    * <strong>api.measure-packages</strong><br>Configuration for multi measures supported by the system
    */
   private List<ApiMeasurePackage> measurePackages;
-
   /**
    * <strong>api.user</strong><br>Configuration related to the user that is responsible for running the installation of Link, such as timezone settings.
    */
@@ -149,7 +160,7 @@ public class ApiConfig {
    */
   private boolean skipQuery = false;
 
-  public boolean ValidDataProcessor(String source, String type) {
+  public boolean validDataProcessor(String source, String type) {
     if (getDataProcessor() == null || getDataProcessor().get(source) == null || getDataProcessor().get(source).equals("")) {
       logger.error("Cannot find data processor for source '{}'", source);
       return false;

@@ -4,6 +4,7 @@ import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.FhirDataProvider;
 import com.lantanagroup.link.GenericAggregator;
 import com.lantanagroup.link.IReportAggregator;
+import com.lantanagroup.link.config.api.ApiConfig;
 import com.lantanagroup.link.config.thsa.THSAConfig;
 import com.lantanagroup.link.model.ReportContext;
 import com.lantanagroup.link.model.ReportCriteria;
@@ -60,14 +61,14 @@ public class THSAAggregator extends GenericAggregator implements IReportAggregat
   }
 
   @Override
-  public MeasureReport generate(ReportCriteria criteria, ReportContext reportContext, ReportContext.MeasureContext measureContext) throws ParseException {
+  public MeasureReport generate(ReportCriteria criteria, ReportContext reportContext, ReportContext.MeasureContext measureContext, ApiConfig apiConfig) throws ParseException {
 
     HashMap<String, Integer> usedInventoryMap = new HashMap<>();
     HashMap<String, Integer> totalInventoryMap = new HashMap<>();
 
     // store the occupied counts from aggregated individual MeasureReport's
     // ONLY beds & icu beds at this point are available, via CQL so restricting to that here.
-    MeasureReport measureReport = super.generate(criteria, reportContext, measureContext);
+    MeasureReport measureReport = super.generate(criteria, reportContext, measureContext, apiConfig);
     PopulateInventoryMap(measureReport, usedInventoryMap, Arrays.asList(NumTotBedsOcc,NumICUBedsOcc));
 
     // look up the bed inventory on the Fhir Server but save the original ID before to restore it

@@ -3,16 +3,14 @@ package com.lantanagroup.link;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.rest.api.MethodOutcome;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.lantanagroup.link.auth.LinkCredentials;
 import com.lantanagroup.link.config.api.ApiConfig;
 import com.lantanagroup.link.config.api.ApiReportDefsBundleConfig;
 import com.lantanagroup.link.config.api.ApiReportDefsConfig;
 import com.lantanagroup.link.config.api.ApiReportDefsUrlConfig;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
-import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.HumanName;
-import org.hl7.fhir.r4.model.MeasureReport;
-import org.hl7.fhir.r4.model.Resource;
+import org.hl7.fhir.r4.model.*;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -71,6 +69,19 @@ public class FhirHelperTests {
     fhirHelperTest = new FhirHelper();
     httpServletRequestTest = mock(HttpServletRequest.class);
     decodedJWTTest = mock(DecodedJWT.class);
+
+    Practitioner mockPractitioner = mock(Practitioner.class);
+    List<Identifier> identifiers = new ArrayList<>();
+    Identifier identifier = new Identifier();
+    identifier.setValue("123456");
+    identifiers.add(identifier);
+    when(mockPractitioner.getIdentifier()).thenReturn(identifiers);
+
+    LinkCredentials mockUser = new LinkCredentials();
+    mockUser.setJwt(mock(DecodedJWT.class));
+    mockUser.setPractitioner(mockPractitioner);
+
+    HttpServletRequest request = mock(HttpServletRequest.class);
     iIdType = mock(IIdType.class);
     iIdType.setValue("Test Audit Event");
     outcomeTest = new MethodOutcome();
@@ -79,7 +90,9 @@ public class FhirHelperTests {
     when(decodedJWTTest.getPayload()).thenReturn("e30");
     when(fhirDataProviderTest.createOutcome(any())).thenReturn(outcomeTest);
 
-    FhirHelper.recordAuditEvent(httpServletRequestTest, fhirDataProviderTest, decodedJWTTest, FhirHelper.AuditEventTypes.Generate, "Testing String");
+    Task jobTask = TaskHelper.getNewTask(mockUser, request, Constants.SCOOP_DATA);
+
+    FhirHelper.recordAuditEvent(jobTask, fhirDataProviderTest, decodedJWTTest, FhirHelper.AuditEventTypes.Generate, "Testing String");
   }
   
   @Test

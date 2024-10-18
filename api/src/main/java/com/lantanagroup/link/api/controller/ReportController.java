@@ -76,6 +76,7 @@ public class ReportController extends BaseController {
     binder.setDisallowedFields(DISALLOWED_FIELDS);
   }
 
+  // TODO - remove me here once scoop finished in ReportDataController
   private void resolveMeasures(ReportCriteria criteria, ReportContext context) throws Exception {
     context.getMeasureContexts().clear();
     for (String bundleId : criteria.getBundleIds()) {
@@ -137,6 +138,12 @@ public class ReportController extends BaseController {
     }
   }
 
+  @PostMapping("/generate-report")
+  public ResponseEntity<Job> generateReport() {
+
+    return ResponseEntity.ok(new Job());
+  }
+
   @PostMapping("/$generate")
   public ResponseEntity<?> generateReport(@AuthenticationPrincipal LinkCredentials user,
                                           HttpServletRequest request,
@@ -159,7 +166,7 @@ public class ReportController extends BaseController {
       throw new ResponseStatusException(HttpStatus.CONFLICT, "A report has already been generated for the specified measure and reporting period. To regenerate the report, submit your request with regenerate=true.");
     }
 
-    Task task = TaskHelper.getNewTask(user, Constants.GENERATE_REPORT);
+    Task task = TaskHelper.getNewTask(user, request, Constants.GENERATE_REPORT);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(task);
     Job job = new Job(task);
@@ -201,7 +208,7 @@ public class ReportController extends BaseController {
     }
     singleMeasureBundleIds = apiMeasurePackage.get().getBundleIds();
 
-    Task response = TaskHelper.getNewTask(user, Constants.GENERATE_REPORT);
+    Task response = TaskHelper.getNewTask(user, request, Constants.GENERATE_REPORT);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(response);
 
@@ -345,7 +352,7 @@ public class ReportController extends BaseController {
 
       response.setMasterId(reportContext.getMasterIdentifierValue());
 
-      this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Successfully Initiated Query");
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Successfully Initiated Query");
 
       for (ReportContext.MeasureContext measureContext : reportContext.getMeasureContexts()) {
 
@@ -354,20 +361,23 @@ public class ReportController extends BaseController {
         response.setMeasureHashId(ReportIdHelper.hash(measureContext.getBundleId()));
 
         String reportAggregatorClassName = FhirHelper.getReportAggregatorClassName(config, measureContext.getReportDefBundle());
-
         IReportAggregator reportAggregator = (IReportAggregator) context.getBean(Class.forName(reportAggregatorClassName));
 
-        ReportGenerator generator = new ReportGenerator(this.stopwatchManager, reportContext, measureContext, criteria, config, user, reportAggregator);
+        String measureGeneratorClassName = FhirHelper.getMeasureGeneratorClassName(config, measureContext.getReportDefBundle());
+        IMeasureGenerator measureGenerator = (IMeasureGenerator) context.getBean(Class.forName(measureGeneratorClassName));
+
+        //ReportGenerator generator = new ReportGenerator(this.stopwatchManager, reportContext, measureContext, criteria, config, user, reportAggregator);
 
         this.eventService.triggerEvent(EventTypes.BeforeMeasureEval, criteria, reportContext, measureContext);
 
-        generator.generate();
+        //generator.generate();
+        measureGenerator.generate(this.stopwatchManager, reportContext, measureContext, criteria, config, user, reportAggregator);
 
         this.eventService.triggerEvent(EventTypes.AfterMeasureEval, criteria, reportContext, measureContext);
 
         this.eventService.triggerEvent(EventTypes.BeforeReportStore, criteria, reportContext, measureContext);
 
-        generator.store();
+        measureGenerator.store(measureContext, reportContext);
 
         this.eventService.triggerEvent(EventTypes.AfterReportStore, criteria, reportContext, measureContext);
 
@@ -397,7 +407,7 @@ public class ReportController extends BaseController {
 
       this.getFhirDataProvider().updateResource(documentReference);
 
-      this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.Generate, "Successfully Generated Report");
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.Generate, "Successfully Generated Report");
       logger.info(String.format("Done generating report %s", documentReference.getIdElement().getIdPart()));
 
       this.stopwatchManager.print();
@@ -557,7 +567,7 @@ public class ReportController extends BaseController {
       note.setText(noteMessage);
       task.addNote(note);
 
-      this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.Send, "Successfully Sent Report");
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.Send, "Successfully Sent Report");
 
       //reportContext.getPatientCensusLists().get(0).getIdElement().getIdPart()
       task.setStatus(Task.TaskStatus.COMPLETED);
@@ -597,7 +607,7 @@ public class ReportController extends BaseController {
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Not configured for sending");
     }
 
-    Task task = TaskHelper.getNewTask(user, Constants.SEND_REPORT);
+    Task task = TaskHelper.getNewTask(user, request, Constants.SEND_REPORT);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(task);
 
@@ -613,20 +623,40 @@ public class ReportController extends BaseController {
           @PathVariable String reportId,
           @PathVariable String type,
           HttpServletResponse response,
-          Authentication authentication,
-          HttpServletRequest request) throws Exception {
+          @AuthenticationPrincipal LinkCredentials user,
+          HttpServletRequest request) {
 
-    if (StringUtils.isEmpty(this.config.getDownloader()))
-      throw new IllegalStateException("Not configured for downloading");
+    // TODO: Austin to verify this after getting new reports to generate
 
-    IReportDownloader downloader;
-    Class<?> downloaderClass = Class.forName(this.config.getDownloader());
-    Constructor<?> downloaderCtor = downloaderClass.getConstructor();
-    downloader = (IReportDownloader) downloaderCtor.newInstance();
+    Task task = TaskHelper.getNewTask(user, request, Constants.REPORT_DOWNLOAD);
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
 
-    downloader.download(reportId, type, this.getFhirDataProvider(), response, this.ctx, this.bundlerConfig, this.eventService);
+    try {
 
-    this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(), FhirHelper.AuditEventTypes.Export, "Successfully Exported Report for Download");
+      if (StringUtils.isEmpty(this.config.getDownloader()))
+        throw new IllegalStateException("Not configured for downloading");
+
+      IReportDownloader downloader;
+      Class<?> downloaderClass = Class.forName(this.config.getDownloader());
+      Constructor<?> downloaderCtor = downloaderClass.getConstructor();
+      downloader = (IReportDownloader) downloaderCtor.newInstance();
+
+      downloader.download(reportId, type, this.getFhirDataProvider(), response, this.ctx, this.bundlerConfig, this.eventService);
+
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.Export, "Successfully Exported Report for Download");
+
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with download: %s", ex.getMessage());
+      logger.error(errorMessage);
+      Annotation note = new Annotation();
+      note.setText(errorMessage);
+      note.setTime(new Date());
+      task.addNote(note);
+      task.setStatus(Task.TaskStatus.FAILED);
+    } finally {
+      task.setLastModified(new Date());
+      fhirDataProvider.updateResource(task);
+    }
   }
 
   @GetMapping(value = "/{reportId}")
@@ -701,9 +731,10 @@ public class ReportController extends BaseController {
     this.getFhirDataProvider().updateResource(data.getMeasureReport());
 
     // TODO: Wrong audit event type? We're saving the report, not sending it
-    this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(),
-            FhirHelper.AuditEventTypes.Send, "Successfully updated MeasureReport with id: " +
-                    documentReference.getMasterIdentifier().getValue());
+    // TODO: Austin create Task for this call and uncomment the audit below
+//    this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(),
+//            FhirHelper.AuditEventTypes.Send, "Successfully updated MeasureReport with id: " +
+//                    documentReference.getMasterIdentifier().getValue());
   }
 
   /**
@@ -810,6 +841,8 @@ public class ReportController extends BaseController {
     // generate code are we storing Patient bundles under that id... only storing
     // under 430749b-patidhash.
     // So here stripping off the measure hash from the passed in id.
+    // ALM 05Oct2024 -> Do we need/want this?  Move to Data Controller with the rest of the Expunge as
+    // UI is no longer in use.
     String masterReportId = id;
     String[] idParts = id.split("-");
     if (idParts.length > 1) {
@@ -840,14 +873,15 @@ public class ReportController extends BaseController {
     deleteRequest.getEntry().get(1).getRequest().setUrl("DocumentReference/" + documentReferenceId);
     this.getFhirDataProvider().transaction(deleteRequest);
 
-    this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(),
-            FhirHelper.AuditEventTypes.Export, "Successfully deleted DocumentReference" +
-                    documentReferenceId + " and MeasureReport " + documentReference.getMasterIdentifier().getValue());
+    // TODO: Austin to create Task for this call and uncomment the audit below.
+//    this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(),
+//            FhirHelper.AuditEventTypes.Export, "Successfully deleted DocumentReference" +
+//                    documentReferenceId + " and MeasureReport " + documentReference.getMasterIdentifier().getValue());
   }
 
   @GetMapping(produces = {MediaType.APPLICATION_JSON_VALUE})
   public ReportBundle searchReports(
-          Authentication authentication,
+          @AuthenticationPrincipal LinkCredentials user,
           HttpServletRequest request,
           @RequestParam(required = false, defaultValue = "1") Integer page,
           @RequestParam(required = false) String author,
@@ -859,117 +893,178 @@ public class ReportController extends BaseController {
           @RequestParam(required = false) String submitted)
           throws Exception {
 
-    Bundle bundle;
-    boolean andCond = false;
+    Task task = TaskHelper.getNewTask(user, request, Constants.REPORT_SEARCH);
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
+
     ReportBundle reportBundle = new ReportBundle();
 
-    String url = this.config.getDataStore().getBaseUrl();
-    if (!url.endsWith("/")) url += "/";
-    url += "DocumentReference?";
-    if (author != null) {
-      url += "author=" + author;
-      andCond = true;
-    }
-    if (identifier != null) {
-      if (andCond) {
-        url += "&";
+    try {
+      Bundle bundle;
+      boolean andCond = false;
+
+      String url = this.config.getDataStore().getBaseUrl();
+      if (!url.endsWith("/")) url += "/";
+      url += "DocumentReference?";
+      if (author != null) {
+
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter author = %s",  author));
+        note.setTime(new Date());
+        task.addNote(note);
+
+        url += "author=" + author;
+        andCond = true;
       }
-      url += "identifier=" + Helper.URLEncode(identifier);
-      andCond = true;
-    }
-    if (periodStartDate != null) {
-      if (andCond) {
-        url += "&";
-      }
-      url += PeriodStartParamName + "=ge" + periodStartDate;
-      andCond = true;
-    }
-    if (periodEndDate != null) {
-      if (andCond) {
-        url += "&";
-      }
-      url += PeriodEndParamName + "=le" + periodEndDate;
-      andCond = true;
-    }
-    if (docStatus != null) {
-      if (andCond) {
-        url += "&";
-      }
-      url += "docStatus=" + docStatus.toLowerCase();
-      andCond = true;
-    }
+      if (identifier != null) {
 
-    Boolean submittedBoolean = null;
-    if (submitted != null) {
-      submittedBoolean = Boolean.parseBoolean(submitted);
-    }
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter identifier = %s",  identifier));
+        note.setTime(new Date());
+        task.addNote(note);
 
-    if (Boolean.TRUE.equals(submittedBoolean)) {
-      // We want to find documents that have been submitted.  Which
-      // should mean that docStatus = final and the date isn't null.
-      // All we can do here is search for docStatus = final then later
-      // also verify that the date has a value.
-      if (andCond) {
-        url += "&";
-      }
-      url += "docStatus=final";
-      andCond = true;
-    } else if (Boolean.FALSE.equals(submittedBoolean)) {
-      // We want to fnd documents that HAVE NOT been submitted.  Which
-      // should mean that docStatus <> final and that the date field is
-      // either missing or set to null.  Which we have to check later.
-      if (andCond) {
-        url += "&";
-      }
-      url += "_filter=docStatus+ne+final";
-      andCond = true;
-    }
-
-    if (submittedDate != null) {
-      if (andCond) {
-        url += "&";
-      }
-      Date submittedDateAsDate = Helper.parseFhirDate(submittedDate);
-      Date theDayAfterSubmittedDateEnd = Helper.addDays(submittedDateAsDate, 1);
-      String theDayAfterSubmittedDateEndAsString = Helper.getFhirDate(theDayAfterSubmittedDateEnd);
-      url += "date=ge" + submittedDate + "&date=le" + theDayAfterSubmittedDateEndAsString;
-    }
-
-    bundle = this.getFhirDataProvider().fetchResourceFromUrl(url);
-    List<Report> lst = bundle.getEntry().parallelStream().map(Report::new).collect(Collectors.toList());
-
-    // Remove items from lst if we are searching for submitted only but the date is null
-    // Only DocumentReferences that have been submitted will have a value for date.
-    if (Boolean.TRUE.equals(submittedBoolean)) {
-      lst.removeIf(report -> report.getSubmittedDate() == null);
-    }
-
-    // Remove items from lst if we are searching for non-submitted but the date
-    // has a value.  Only DocumentReference that have been submitted will have a value for
-    // date
-    if (Boolean.FALSE.equals(submittedBoolean)) {
-      lst.removeIf(report -> report.getSubmittedDate() != null);
-    }
-
-
-    List<String> reportIds = lst.stream().map(report -> ReportIdHelper.getMasterMeasureReportId(report.getId(),report.getReportMeasure().getValue())).collect(Collectors.toList());
-    Bundle response = this.getFhirDataProvider().getMeasureReportsByIds(reportIds);
-
-    response.getEntry().parallelStream().forEach(bundleEntry -> {
-      if (bundleEntry.getResource().getResourceType().equals(ResourceType.MeasureReport)) {
-        MeasureReport measureReport = (MeasureReport) bundleEntry.getResource();
-        Extension extension = measureReport.getExtensionByUrl(Constants.NotesUrl);
-        Report foundReport = lst.stream().filter(rep -> rep.getId().equals(measureReport.getIdElement().getIdPart().split("-")[0])).findAny().orElse(null);
-        if (extension != null && foundReport != null) {
-          foundReport.setNote(extension.getValue().toString());
+        if (andCond) {
+          url += "&";
         }
+        url += "identifier=" + Helper.URLEncode(identifier);
+        andCond = true;
       }
-    });
-    reportBundle.setReportTypeId(bundle.getId());
-    reportBundle.setList(lst);
-    reportBundle.setTotalSize(bundle.getTotal());
+      if (periodStartDate != null) {
 
-    this.getFhirDataProvider().audit(request, ((LinkCredentials) authentication.getPrincipal()).getJwt(), FhirHelper.AuditEventTypes.SearchReports, "Successfully Searched Reports");
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter period start date = %s",  periodStartDate));
+        note.setTime(new Date());
+        task.addNote(note);
+
+        if (andCond) {
+          url += "&";
+        }
+        url += PeriodStartParamName + "=ge" + periodStartDate;
+        andCond = true;
+      }
+      if (periodEndDate != null) {
+
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter period end date = %s",  periodEndDate));
+        note.setTime(new Date());
+        task.addNote(note);
+
+        if (andCond) {
+          url += "&";
+        }
+        url += PeriodEndParamName + "=le" + periodEndDate;
+        andCond = true;
+      }
+      if (docStatus != null) {
+
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter document status = %s",  docStatus));
+        note.setTime(new Date());
+        task.addNote(note);
+
+        if (andCond) {
+          url += "&";
+        }
+        url += "docStatus=" + docStatus.toLowerCase();
+        andCond = true;
+      }
+
+      Boolean submittedBoolean = null;
+      if (submitted != null) {
+        submittedBoolean = Boolean.parseBoolean(submitted);
+
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter submitted = %s",  submittedBoolean));
+        note.setTime(new Date());
+        task.addNote(note);
+
+      }
+
+      if (Boolean.TRUE.equals(submittedBoolean)) {
+        // We want to find documents that have been submitted.  Which
+        // should mean that docStatus = final and the date isn't null.
+        // All we can do here is search for docStatus = final then later
+        // also verify that the date has a value.
+        if (andCond) {
+          url += "&";
+        }
+        url += "docStatus=final";
+        andCond = true;
+      } else if (Boolean.FALSE.equals(submittedBoolean)) {
+        // We want to fnd documents that HAVE NOT been submitted.  Which
+        // should mean that docStatus <> final and that the date field is
+        // either missing or set to null.  Which we have to check later.
+        if (andCond) {
+          url += "&";
+        }
+        url += "_filter=docStatus+ne+final";
+        andCond = true;
+      }
+
+      if (submittedDate != null) {
+
+        Annotation note = new Annotation();
+        note.setText(String.format("Report search parameter submitted date = %s",  submittedDate));
+        note.setTime(new Date());
+        task.addNote(note);
+
+        if (andCond) {
+          url += "&";
+        }
+        Date submittedDateAsDate = Helper.parseFhirDate(submittedDate);
+        Date theDayAfterSubmittedDateEnd = Helper.addDays(submittedDateAsDate, 1);
+        String theDayAfterSubmittedDateEndAsString = Helper.getFhirDate(theDayAfterSubmittedDateEnd);
+        url += "date=ge" + submittedDate + "&date=le" + theDayAfterSubmittedDateEndAsString;
+      }
+
+      bundle = this.getFhirDataProvider().fetchResourceFromUrl(url);
+      List<Report> lst = bundle.getEntry().parallelStream().map(Report::new).collect(Collectors.toList());
+
+      // Remove items from lst if we are searching for submitted only but the date is null
+      // Only DocumentReferences that have been submitted will have a value for date.
+      if (Boolean.TRUE.equals(submittedBoolean)) {
+        lst.removeIf(report -> report.getSubmittedDate() == null);
+      }
+
+      // Remove items from lst if we are searching for non-submitted but the date
+      // has a value.  Only DocumentReference that have been submitted will have a value for
+      // date
+      if (Boolean.FALSE.equals(submittedBoolean)) {
+        lst.removeIf(report -> report.getSubmittedDate() != null);
+      }
+
+      List<String> reportIds = lst.stream().map(report -> ReportIdHelper.getMasterMeasureReportId(report.getId(), report.getReportMeasure().getValue())).collect(Collectors.toList());
+      Bundle response = this.getFhirDataProvider().getMeasureReportsByIds(reportIds);
+
+      response.getEntry().parallelStream().forEach(bundleEntry -> {
+        if (bundleEntry.getResource().getResourceType().equals(ResourceType.MeasureReport)) {
+          MeasureReport measureReport = (MeasureReport) bundleEntry.getResource();
+          Extension extension = measureReport.getExtensionByUrl(Constants.NotesUrl);
+          Report foundReport = lst.stream().filter(rep -> rep.getId().equals(measureReport.getIdElement().getIdPart().split("-")[0])).findAny().orElse(null);
+          if (extension != null && foundReport != null) {
+            foundReport.setNote(extension.getValue().toString());
+          }
+        }
+      });
+      reportBundle.setReportTypeId(bundle.getId());
+      reportBundle.setList(lst);
+      reportBundle.setTotalSize(bundle.getTotal());
+
+      task.setStatus(Task.TaskStatus.COMPLETED);
+
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.SearchReports, "Successfully Searched Reports");
+
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with searching reports: %s", ex.getMessage());
+      logger.error(errorMessage);
+      Annotation note = new Annotation();
+      note.setText(errorMessage);
+      note.setTime(new Date());
+      task.addNote(note);
+      task.setStatus(Task.TaskStatus.FAILED);
+    } finally {
+      task.setLastModified(new Date());
+      fhirDataProvider.updateResource(task);
+    }
 
     return reportBundle;
   }
@@ -1147,7 +1242,7 @@ public class ReportController extends BaseController {
 
     String reportAggregatorClassName = FhirHelper.getReportAggregatorClassName(config, measureBundle);
     IReportAggregator reportAggregator = (IReportAggregator) context.getBean(Class.forName(reportAggregatorClassName));
-    MeasureReport updatedMeasureReport = reportAggregator.generate(criteria, reportContext, measureContext);
+    MeasureReport updatedMeasureReport = reportAggregator.generate(criteria, reportContext, measureContext, config);
 
     updatedMeasureReport.setId(reportId);
     updatedMeasureReport.setExtension(measureReport.getExtension());    // Copy extensions from the original report before overwriting
@@ -1177,7 +1272,8 @@ public class ReportController extends BaseController {
     this.getFhirDataProvider().transaction(reportUpdateBundle);
 
     // Record an audit event that the report has had exclusions
-    this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.ExcludePatients, String.format("Excluded %s patients from report %s", excludedPatients.size(), reportId));
+    // TODO: Austin to create Task for this call and uncomment audit below
+    //this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.ExcludePatients, String.format("Excluded %s patients from report %s", excludedPatients.size(), reportId));
 
     // Create the ReportModel that will be returned
     ReportModel report = new ReportModel();

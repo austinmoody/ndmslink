@@ -45,7 +45,7 @@ public class Constants {
   public static final String LINK_VERSION_URL = "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/link-version";
   public static final String MEASURE_VERSION_URL = "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/measure-version";
   public static final String LinkUser = "link-user";
-  public static final String SANER_JOB_TYPE_SYSTEM = "https://thsa1.sanerproject.org:10443/fhir/ValueSet/saner-job-types";
+  public static final String SANER_JOB_TYPE_SYSTEM = "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/saner-job-types";
   public static final Coding EXPUNGE_TASK = new Coding().setCode("expunge-data").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Expunge Data");
   public static final Coding MANUAL_EXPUNGE = new Coding().setCode("manual-expunge").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Manual Expunge");
   public static final Coding REFRESH_PATIENT_LIST = new Coding().setCode("refresh-patient-list").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Refresh Patient List");
@@ -54,4 +54,20 @@ public class Constants {
   public static final Coding EXTERNAL_FILE_DOWNLOAD = new Coding().setCode("external-file-download").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("File Downloaded From Source");
   public static final Coding SEND_REPORT  = new Coding().setCode("send-report").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Send Report");
   public static final String DOCUMENT_REFERENCE_VERSION_URL = "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-report-version";
+  public static final Coding SCOOP_DATA = new Coding().setCode("scoop-data").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Scoop Data");
+
+  public static final Coding REMOTE_ADDRESS = new Coding()
+          .setSystem("https://thsa1.sanerproject.org:10443/fhir/CodeSystem/task-input-types")
+          .setCode("remote-address")
+          .setDisplay("Remote Address");
+
+  public static final Coding REPORT_DOWNLOAD = new Coding()
+          .setSystem(SANER_JOB_TYPE_SYSTEM)
+          .setDisplay("Report Download")
+          .setCode("report-download");
+
+  public static final Coding REPORT_SEARCH = new Coding()
+          .setSystem(SANER_JOB_TYPE_SYSTEM)
+          .setDisplay("Report Search")
+          .setCode("report-search");
 }

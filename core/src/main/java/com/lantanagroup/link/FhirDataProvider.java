@@ -189,6 +189,14 @@ public class FhirDataProvider {
     return this.client.read().resource(Measure.class).withId(measureId).execute();
   }
 
+  public CodeSystem getCodeSystemById(String codeSystemId) {
+    return this.client.read().resource(CodeSystem.class).withId(codeSystemId).execute();
+  }
+
+  public ConceptMap getConceptMapById(String conceptMapId) {
+    return this.client.read().resource(ConceptMap.class).withId(conceptMapId).execute();
+  }
+
   public Task getTaskById(String taskId) {
     return this.client.read().resource(Task.class).withId(taskId).execute();
   }
@@ -274,8 +282,8 @@ public class FhirDataProvider {
     return (Measure) measureBundle.getEntryFirstRep().getResource();
   }
 
-  public void audit(HttpServletRequest request, DecodedJWT jwt, FhirHelper.AuditEventTypes type, String outcomeDescription) {
-    AuditEvent auditEvent = FhirHelper.createAuditEvent(request, jwt, type, outcomeDescription);
+  public void audit(Task jobTask, DecodedJWT jwt, FhirHelper.AuditEventTypes type, String outcomeDescription) {
+    AuditEvent auditEvent = FhirHelper.createAuditEvent(jobTask, jwt, type, outcomeDescription);
     this.createResource(auditEvent);
   }
 

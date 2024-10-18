@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.annotation.PreDestroy;
+import javax.servlet.http.HttpServletRequest;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
@@ -101,11 +102,12 @@ public class PatientIdentifierController extends BaseController {
   @PostMapping(value = "/fhir/PatientList", consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_XML_VALUE})
   public ResponseEntity<?> getPatientIdentifierList(
           @AuthenticationPrincipal LinkCredentials user,
+          HttpServletRequest request,
           @RequestBody() String body,
           @RequestHeader("Content-Type") String contentType
   ) {
 
-    Task task = TaskHelper.getNewTask(user, Constants.REFRESH_PATIENT_LIST);
+    Task task = TaskHelper.getNewTask(user, request, Constants.REFRESH_PATIENT_LIST);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(task);
     Job job = new Job(task);

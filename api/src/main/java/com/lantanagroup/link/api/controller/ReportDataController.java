@@ -4,11 +4,12 @@ import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.*;
 import com.lantanagroup.link.auth.LinkCredentials;
 import com.lantanagroup.link.config.datagovernance.DataGovernanceConfig;
+import com.lantanagroup.link.config.query.QueryConfig;
 import com.lantanagroup.link.config.query.USCoreConfig;
 import com.lantanagroup.link.config.query.USCoreOtherResourceTypeConfig;
-import com.lantanagroup.link.model.ExpungeResourcesToDelete;
-import com.lantanagroup.link.model.Job;
-import com.lantanagroup.link.model.UploadFile;
+import com.lantanagroup.link.model.*;
+import com.lantanagroup.link.query.IQuery;
+import com.lantanagroup.link.query.QueryFactory;
 import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.r4.model.*;
@@ -16,12 +17,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import javax.annotation.PreDestroy;
 import javax.servlet.http.HttpServletRequest;
@@ -29,9 +32,12 @@ import javax.validation.Valid;
 import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.Duration;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
@@ -81,7 +87,7 @@ public class ReportDataController extends BaseController {
 
     logger.info("Received UploadFile of Type '{}' and Name '{}'", uploadFile.getType(), uploadFile.getName());
 
-    Task task = TaskHelper.getNewTask(user, Constants.FILE_UPLOAD);
+    Task task = TaskHelper.getNewTask(user, request, Constants.FILE_UPLOAD);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(task);
     Job job = new Job(task);
@@ -101,7 +107,7 @@ public class ReportDataController extends BaseController {
       uploadFile.setSource("generic");
     }
 
-    boolean validDataProcessorConfig = config.ValidDataProcessor(uploadFile.getSource(), uploadFile.getType());
+    boolean validDataProcessorConfig = config.validDataProcessor(uploadFile.getSource(), uploadFile.getType());
     if (!validDataProcessorConfig) {
       String errorMessage = "Data Processor configuration is invalid.  Check 'data-process' section of API configuration";
       logger.error(errorMessage);
@@ -176,7 +182,7 @@ public class ReportDataController extends BaseController {
       for (String resourceIdentifier : resourcesToDelete.getResourceIdentifiers()) {
         try {
           fhirDataProvider.deleteResource(resourcesToDelete.getResourceType(), resourceIdentifier, true);
-          getFhirDataProvider().audit(request,
+          getFhirDataProvider().audit(task,
                   user.getJwt(),
                   FhirHelper.AuditEventTypes.Delete,
                   String.format("Resource of Type '%s' with Id of '%s' has been expunged.", resourcesToDelete.getResourceType(), resourceIdentifier));
@@ -233,7 +239,7 @@ public class ReportDataController extends BaseController {
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorMessage);
     }
 
-    Task task = TaskHelper.getNewTask(user, Constants.MANUAL_EXPUNGE);
+    Task task = TaskHelper.getNewTask(user, request, Constants.MANUAL_EXPUNGE);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(task);
     Job job = new Job(task);
@@ -243,7 +249,7 @@ public class ReportDataController extends BaseController {
     return ResponseEntity.ok(job);
   }
 
-  private void expungeData(LinkCredentials user, HttpServletRequest request, String taskId) {
+  private void expungeData(LinkCredentials user, String taskId) {
 
     logger.info("Data Expunge Started (Task ID: {})", taskId);
 
@@ -256,14 +262,14 @@ public class ReportDataController extends BaseController {
         throw new Exception(String.format("API Data Governance Not Configured (Task ID %s)", taskId));
       }
 
-      expungeCountByTypeAndRetentionAndPatientFilter(request,
+      expungeCountByTypeAndRetentionAndPatientFilter(task,
               user,
               dataGovernanceConfig.getExpungeChunkSize(),
               "List",
               dataGovernanceConfig.getCensusListRetention(),
               false);
 
-      expungeCountByTypeAndRetentionAndPatientFilter(request,
+      expungeCountByTypeAndRetentionAndPatientFilter(task,
               user,
               dataGovernanceConfig.getExpungeChunkSize(),
               "Bundle",
@@ -271,7 +277,7 @@ public class ReportDataController extends BaseController {
               true);
 
       // This to remove the "placeholder" Patient resources
-      expungeCountByTypeAndRetentionAndPatientFilter(request,
+      expungeCountByTypeAndRetentionAndPatientFilter(task,
               user,
               dataGovernanceConfig.getExpungeChunkSize(),
               "Patient",
@@ -280,7 +286,7 @@ public class ReportDataController extends BaseController {
 
       // Remove individual MeasureReport tied to Patient
       // Individual MeasureReport for patient will be tagged.  Others have no PHI.
-      expungeCountByTypeAndRetentionAndPatientFilter(request,
+      expungeCountByTypeAndRetentionAndPatientFilter(task,
               user,
               dataGovernanceConfig.getExpungeChunkSize(),
               "MeasureReport",
@@ -289,7 +295,7 @@ public class ReportDataController extends BaseController {
 
       // Loop uscore.patient-resource-types & other-resource-types and delete
       for (String resourceType : usCoreConfig.getPatientResourceTypes()) {
-        expungeCountByTypeAndRetentionAndPatientFilter(request,
+        expungeCountByTypeAndRetentionAndPatientFilter(task,
                 user,
                 dataGovernanceConfig.getExpungeChunkSize(),
                 resourceType,
@@ -298,7 +304,7 @@ public class ReportDataController extends BaseController {
       }
 
       for (USCoreOtherResourceTypeConfig otherResourceType : usCoreConfig.getOtherResourceTypes()) {
-        expungeCountByTypeAndRetentionAndPatientFilter(request,
+        expungeCountByTypeAndRetentionAndPatientFilter(task,
                 user,
                 dataGovernanceConfig.getExpungeChunkSize(),
                 otherResourceType.getResourceType(),
@@ -334,12 +340,12 @@ public class ReportDataController extends BaseController {
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("User does not have proper role to expunge data.");
     }
 
-    Task task = TaskHelper.getNewTask(user, Constants.EXPUNGE_TASK);
+    Task task = TaskHelper.getNewTask(user, request, Constants.EXPUNGE_TASK);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(task);
     Job job = new Job(task);
 
-    executor.submit(() -> expungeData(user, request, task.getId()));
+    executor.submit(() -> expungeData(user, task.getId()));
 
     return ResponseEntity.ok(job);
   }
@@ -362,7 +368,7 @@ public class ReportDataController extends BaseController {
     return rightNow.getTime();
   }
 
-  private void expungeCountByTypeAndRetentionAndPatientFilter(HttpServletRequest request, LinkCredentials user, Integer count, String resourceType, String retention, Boolean filterPatientTag) throws DatatypeConfigurationException {
+  private void expungeCountByTypeAndRetentionAndPatientFilter(Task jobTask, LinkCredentials user, Integer count, String resourceType, String retention, Boolean filterPatientTag) throws DatatypeConfigurationException {
     int bundleEntrySize = 1;
     int expunged = 0;
     Bundle bundle;
@@ -387,7 +393,7 @@ public class ReportDataController extends BaseController {
 
           expungeResourceById(entry.getResource().getIdElement().getIdPart(),
                   entry.getResource().getResourceType().toString(),
-                  request,
+                  jobTask,
                   user);
 
           expunged++;
@@ -403,11 +409,11 @@ public class ReportDataController extends BaseController {
 
   }
 
-  private void expungeResourceById(String id, String type, HttpServletRequest request, LinkCredentials user) {
+  private void expungeResourceById(String id, String type, Task jobTask, LinkCredentials user) {
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     try {
       fhirDataProvider.deleteResource(type, id, true);
-      getFhirDataProvider().audit(request,
+      getFhirDataProvider().audit(jobTask,
               user.getJwt(),
               FhirHelper.AuditEventTypes.Delete,
               String.format("Resource of Type '%s' with Id of '%s' has been expunged.", type, id));
@@ -431,4 +437,169 @@ public class ReportDataController extends BaseController {
     return hasExpungeRole;
 
   }
+
+  @PostMapping("/data/scoop")
+  public ResponseEntity<Job> scoopData(@AuthenticationPrincipal LinkCredentials user,
+                                       HttpServletRequest request,
+                                       @Valid @RequestBody ScoopData input,
+                                       BindingResult bindingResult) {
+
+    Task task = TaskHelper.getNewTask(user, request, Constants.SCOOP_DATA);
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
+
+    try {
+
+      // Verify payload
+      if (bindingResult.hasErrors()) {
+        String errorMessage = bindingResult.getAllErrors().stream()
+                .map(DefaultMessageSourceResolvable::getDefaultMessage)
+                .collect(Collectors.joining(", "));
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errorMessage);
+      }
+
+      ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getPeriodStart(), input.getPeriodEnd());
+
+      ReportContext reportContext = new ReportContext(this.getFhirDataProvider());
+      reportContext.setRequest(request);
+      reportContext.setUser(user);
+
+      task.addNote(input.getAnnotation());
+      fhirDataProvider.updateResource(task);
+
+      // Scoop It
+      executor.submit(() -> scoopData(user, criteria, reportContext, task.getId()));
+
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Successfully Initiated Query");
+
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with data scoop API call: %s", ex.getMessage());
+      logger.error(errorMessage);
+      Annotation note = new Annotation();
+      note.setText(errorMessage);
+      note.setTime(new Date());
+      task.addNote(note);
+      task.setStatus(Task.TaskStatus.FAILED);
+      return ResponseEntity.badRequest().body(new Job(task));
+    } finally {
+      task.setLastModified(new Date());
+      fhirDataProvider.updateResource(task);
+    }
+
+    return ResponseEntity.ok(new Job(task));
+  }
+
+  private void scoopData(LinkCredentials user, ReportCriteria reportCriteria, ReportContext reportContext, String taskId) {
+
+    // Get the task so that it can be updated later
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
+    Task task = fhirDataProvider.getTaskById(taskId);
+
+    try {
+      // Add parameters used to scoop data to Task
+      task.addNote(reportCriteria.getAnnotation());
+
+      // Get Measure definition from CQF server
+      this.resolveMeasures(reportCriteria, reportContext);
+
+      String masterIdentifierValue = ReportIdHelper.getMasterIdentifierValue(reportCriteria);
+
+      // Add note to Task
+      Annotation note = new Annotation();
+      note.setTime(new Date());
+      note.setText(String.format("Scooping data for master identifier: %s", masterIdentifierValue));
+      task.addNote(note);
+
+      // Get the patient identifiers for the given date
+      getPatientIdentifiers(reportCriteria, reportContext);
+
+      if (reportContext.getPatientCensusLists().isEmpty()) {
+        String msg = "A census for the specified criteria was not found.";
+        logger.error(msg);
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, msg);
+      }
+
+      // Add Lists(s) being process for report to Task
+      List<String> listsIds = new ArrayList<>();
+      for (ListResource lr : reportContext.getPatientCensusLists()) {
+        listsIds.add(lr.getIdElement().getIdPart());
+      }
+      note = new Annotation();
+      note.setTime(new Date());
+      note.setText(String.format("Patient Census Lists processed: %s", String.join(",", listsIds)));
+      task.addNote(note);
+
+      // Get the resource types to query
+      // First from the Measure definition
+      // But then only retain what is configured in uscore.patient-resource-types
+      // RECONSIDER: This was important for THSA because we used CQL.  For NDMS we are doing more of a manual
+      //             calculation so we really only care about what we have configured in uscore to scoop.
+      Set<String> resourceTypesToQuery = new HashSet<>();
+      for (ReportContext.MeasureContext measureContext : reportContext.getMeasureContexts()) {
+        resourceTypesToQuery.addAll(FhirHelper.getDataRequirementTypes(measureContext.getReportDefBundle()));
+      }
+      resourceTypesToQuery.retainAll(usCoreConfig.getPatientResourceTypes());
+
+      // Add list of Resource types that we are going to query to the Task
+      note = new Annotation();
+      note.setTime(new Date());
+      note.setText(String.format("Scooping the following Resource types: %s", String.join(",", resourceTypesToQuery)));
+      task.addNote(note);
+
+      this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Initiating Query For Resources");
+
+      // Scoop the data for the patients and store it
+      QueryConfig queryConfig = this.context.getBean(QueryConfig.class);
+      IQuery query = QueryFactory.getQueryInstance(this.context, queryConfig.getQueryClass());
+      List<String> measureIds = reportContext.getMeasureContexts().stream()
+              .map(measureContext -> measureContext.getMeasure().getIdentifierFirstRep().getValue())
+              .collect(Collectors.toList());
+      query.execute(reportCriteria, reportContext, reportContext.getPatientsOfInterest(), masterIdentifierValue, new ArrayList<>(resourceTypesToQuery), measureIds);
+
+      note = new Annotation();
+      note.setTime(new Date());
+      note.setText("Scooping complete");
+      task.addNote(note);
+
+      task.setStatus(Task.TaskStatus.COMPLETED);
+
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with scooping data: %s", ex.getMessage());
+      logger.error(errorMessage);
+      Annotation note = new Annotation();
+      note.setText(errorMessage);
+      note.setTime(new Date());
+      task.addNote(note);
+      task.setStatus(Task.TaskStatus.FAILED);
+    } finally {
+      task.setLastModified(new Date());
+      fhirDataProvider.updateResource(task);
+    }
+  }
+
+  private void getPatientIdentifiers(ReportCriteria criteria, ReportContext context) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
+    IPatientIdProvider provider;
+    Class<?> patientIdResolverClass = Class.forName(this.config.getPatientIdResolver());
+    Constructor<?> patientIdentifierConstructor = patientIdResolverClass.getConstructor();
+    provider = (IPatientIdProvider) patientIdentifierConstructor.newInstance();
+    provider.getPatientsOfInterest(criteria, context, this.config);
+  }
+
+  private void resolveMeasures(ReportCriteria criteria, ReportContext context) throws Exception {
+    context.getMeasureContexts().clear();
+    for (String bundleId : criteria.getBundleIds()) {
+
+      // Pull the report definition bundle from CQF (eval service)
+      FhirDataProvider evaluationProvider = new FhirDataProvider(config.getEvaluationService());
+      Bundle reportDefBundle = evaluationProvider.getBundleById(bundleId);
+
+      // Update the context
+      ReportContext.MeasureContext measureContext = new ReportContext.MeasureContext();
+      measureContext.setReportDefBundle(reportDefBundle);
+      measureContext.setBundleId(reportDefBundle.getIdElement().getIdPart());
+      Measure measure = FhirHelper.getMeasure(reportDefBundle);
+      measureContext.setMeasure(measure);
+      context.getMeasureContexts().add(measureContext);
+    }
+  }
+
 }
