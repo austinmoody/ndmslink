@@ -19,8 +19,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
-import com.lantanagroup.link.ndms.NdmsConstants;
-
 @Component
 public class NdmsAggregator implements IReportAggregator {
 
@@ -33,12 +31,14 @@ public class NdmsAggregator implements IReportAggregator {
         // Create the master measure report
         MeasureReport masterMeasureReport = new MeasureReport();
         masterMeasureReport.setId(measureContext.getReportId());
-        masterMeasureReport.setType(MeasureReport.MeasureReportType.SUBJECTLIST);
+        masterMeasureReport.setType(MeasureReport.MeasureReportType.SUMMARY);
         masterMeasureReport.setStatus(MeasureReport.MeasureReportStatus.COMPLETE);
         masterMeasureReport.setPeriod(new Period());
         masterMeasureReport.getPeriod().setStart(Helper.parseFhirDate(criteria.getPeriodStart()));
         masterMeasureReport.getPeriod().setEnd(Helper.parseFhirDate(criteria.getPeriodEnd()));
         masterMeasureReport.setMeasure(measureContext.getMeasure().getUrl());
+
+        //TODO: Add reporter
 
         Map<BedTallyKey, Integer> bedTypeTally = new HashMap<>();
         // Loop all the patient-level MeasureReports and tally up count by code
@@ -76,7 +76,7 @@ public class NdmsAggregator implements IReportAggregator {
                 break;
             }
 
-            // For Available Calcuation
+            // For Available Calculation
             // Get the totals.  We'll subtract occupied from it
             // REFACTOR: Assuming there is only 1 population for the Group
             int availableCount = totalsGroup.getPopulationFirstRep().getCount();
