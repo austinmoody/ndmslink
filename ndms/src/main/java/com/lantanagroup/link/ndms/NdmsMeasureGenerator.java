@@ -154,6 +154,9 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
         // Add  Organization Information to MeasureReport
         ndmsUtility.addOrganizationToMeasureReport(masterMeasureReport, reportContext.getReportOrganization());
 
+        // Tag "Master" MeasureReport
+        masterMeasureReport.getMeta().addTag(Constants.NDMS_AGGREGATE_MEASURE_REPORT);
+
         measureContext.setMeasureReport(masterMeasureReport);
 
     }

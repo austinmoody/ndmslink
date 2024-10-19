@@ -72,4 +72,10 @@ public class Constants {
           .setCode("report-search");
 
   public static final String FHIR_GEOLOCATION_URL = "http://hl7.org/fhir/StructureDefinition/geolocation";
+
+  public static final Coding NDMS_AGGREGATE_MEASURE_REPORT = new Coding()
+          .setCode("ndms-aggregate-measure-report")
+          .setDisplay("NDMS Aggregate Measure Report")
+          .setSystem(Constants.MainSystem);
+
 }
