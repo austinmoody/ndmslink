@@ -38,8 +38,6 @@ public class NdmsAggregator implements IReportAggregator {
         masterMeasureReport.getPeriod().setEnd(Helper.parseFhirDate(criteria.getPeriodEnd()));
         masterMeasureReport.setMeasure(measureContext.getMeasure().getUrl());
 
-        //TODO: Add reporter
-
         Map<BedTallyKey, Integer> bedTypeTally = new HashMap<>();
         // Loop all the patient-level MeasureReports and tally up count by code
         for (MeasureReport measureReport: measureContext.getPatientReports()) {

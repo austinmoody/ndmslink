@@ -70,4 +70,6 @@ public class Constants {
           .setSystem(SANER_JOB_TYPE_SYSTEM)
           .setDisplay("Report Search")
           .setCode("report-search");
+
+  public static final String FHIR_GEOLOCATION_URL = "http://hl7.org/fhir/StructureDefinition/geolocation";
 }

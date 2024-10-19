@@ -3,7 +3,6 @@ package com.lantanagroup.link.api.controller;
 import ca.uhn.fhir.model.api.TemporalPrecisionEnum;
 import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.*;
-import com.lantanagroup.link.api.ReportGenerator;
 import com.lantanagroup.link.auth.LinkCredentials;
 import com.lantanagroup.link.config.api.ApiMeasurePackage;
 import com.lantanagroup.link.config.query.QueryConfig;
@@ -13,6 +12,7 @@ import com.lantanagroup.link.query.IQuery;
 import com.lantanagroup.link.query.QueryFactory;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,8 +44,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/report")
 public class ReportController extends BaseController {
   private static final Logger logger = LoggerFactory.getLogger(ReportController.class);
-  private static final String PeriodStartParamName = "periodStart";
-  private static final String PeriodEndParamName = "periodEnd";
+  private static final String PERIOD_START_PARAM_NAME = "periodStart";
+  private static final String PERIOD_END_PARAM_NAME = "periodEnd";
   // Disallow binding of sensitive attributes
   // Ex: DISALLOWED_FIELDS = new String[]{"details.role", "details.age", "is_admin"};
   final String[] DISALLOWED_FIELDS = new String[]{};
@@ -74,6 +74,27 @@ public class ReportController extends BaseController {
   @InitBinder
   public void initBinder(WebDataBinder binder) {
     binder.setDisallowedFields(DISALLOWED_FIELDS);
+  }
+
+  private void resolveOrganization(ReportCriteria criteria, ReportContext context) {
+    FhirDataProvider dataStore = new FhirDataProvider(config.getDataStore());
+    Organization organization = dataStore.getOrganizationById(criteria.getOrganizationId());
+
+    // Verify that this Organization has an extension in the Address with GeoLocation
+    boolean foundAddressWithGeolocation = false;
+    for (Address address : organization.getAddress()) {
+      for (Extension extension : address.getExtension()) {
+        if (extension.getUrl().equals(Constants.FHIR_GEOLOCATION_URL)) {
+          foundAddressWithGeolocation = true;
+        }
+      }
+    }
+
+    if (!foundAddressWithGeolocation) {
+      throw new FHIRException(String.format("Organization %s, specified for report generation does not include necessary geolocation", criteria.getOrganizationId()));
+    }
+
+    context.setReportOrganization(organization);
   }
 
   // TODO - remove me here once scoop finished in ReportDataController
@@ -156,7 +177,7 @@ public class ReportController extends BaseController {
     // We want to go ahead here and see if a report with the identifier this criteria would generate already
     // exists.  If so but the regenerate flag isn't set then we want to fail with a 409, which is the legacy
     // behavior expected by the Web component.
-    ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getPeriodStart(), input.getPeriodEnd());
+    ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getOrganizationId(), input.getPeriodStart(), input.getPeriodEnd());
     String masterIdentifierValue = ReportIdHelper.getMasterIdentifierValue(criteria);
     // search by masterIdentifierValue to uniquely identify the document - searching by combination of identifiers could return multiple documents
     // like in the case one document contains the subset of identifiers of what other document contains
@@ -171,8 +192,18 @@ public class ReportController extends BaseController {
     fhirDataProvider.updateResource(task);
     Job job = new Job(task);
 
-    // Update generateResponse to take Task id (or overload in some way)
-    executor.submit(() -> generateResponse(user, request, input.getBundleIds(), input.getPeriodStart(), input.getPeriodEnd(), input.isRegenerate(), job.getId()));
+    executor.submit(
+            () -> generateResponse(
+                    user,
+                    request,
+                    input.getOrganizationId(),
+                    input.getBundleIds(),
+                    input.getPeriodStart(),
+                    input.getPeriodEnd(),
+                    input.isRegenerate(),
+                    job.getId()
+            )
+    );
 
     return ResponseEntity.ok(job);
   }
@@ -190,6 +221,7 @@ public class ReportController extends BaseController {
           @RequestParam("multiMeasureBundleId") String multiMeasureBundleId,
           @RequestParam("periodStart") String periodStart,
           @RequestParam("periodEnd") String periodEnd,
+          @RequestParam("organizationId") String organizationId,
           boolean regenerate)
           throws Exception {
     String[] singleMeasureBundleIds = new String[]{};
@@ -212,13 +244,21 @@ public class ReportController extends BaseController {
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(response);
 
-    return generateResponse(user, request, singleMeasureBundleIds, periodStart, periodEnd, regenerate, response.getId());
+    return generateResponse(user, request, organizationId, singleMeasureBundleIds, periodStart, periodEnd, regenerate, response.getId());
   }
 
   /**
    * generates a response with one or multiple reports
    */
-  private GenerateResponse generateResponse(LinkCredentials user, HttpServletRequest request, String[] bundleIds, String periodStart, String periodEnd, boolean regenerate, String taskId) throws Exception {
+  private GenerateResponse generateResponse(
+          LinkCredentials user,
+          HttpServletRequest request,
+          String organizationId,
+          String[] bundleIds,
+          String periodStart,
+          String periodEnd,
+          boolean regenerate,
+          String taskId) throws Exception {
 
     GenerateResponse response = new GenerateResponse();
 
@@ -231,7 +271,8 @@ public class ReportController extends BaseController {
       // Add parameters used to generate report to Task
       Annotation note = new Annotation();
       note.setTime(new Date());
-      note.setText(String.format("Report being generated with paramters: periodStart - %s / periodEnd - %s / regenerate - %s / bundleIds - %s",
+      note.setText(String.format("Report being generated with paramters: Organization - %s / periodStart - %s / periodEnd - %s / regenerate - %s / bundleIds - %s",
+              organizationId,
               periodStart,
               periodEnd,
               regenerate,
@@ -239,7 +280,7 @@ public class ReportController extends BaseController {
       task.addNote(note);
 
 
-      ReportCriteria criteria = new ReportCriteria(List.of(bundleIds), periodStart, periodEnd);
+      ReportCriteria criteria = new ReportCriteria(List.of(bundleIds), organizationId, periodStart, periodEnd);
       ReportContext reportContext = new ReportContext(this.getFhirDataProvider());
 
       reportContext.setRequest(request);
@@ -249,6 +290,9 @@ public class ReportController extends BaseController {
 
       // Get the latest measure def and update it on the FHIR storage server
       this.resolveMeasures(criteria, reportContext);
+
+      // Pull specified Organization and add to context
+      resolveOrganization(criteria, reportContext);
 
       this.eventService.triggerEvent(EventTypes.AfterMeasureResolution, criteria, reportContext);
 
@@ -938,7 +982,7 @@ public class ReportController extends BaseController {
         if (andCond) {
           url += "&";
         }
-        url += PeriodStartParamName + "=ge" + periodStartDate;
+        url += PERIOD_START_PARAM_NAME + "=ge" + periodStartDate;
         andCond = true;
       }
       if (periodEndDate != null) {
@@ -951,7 +995,7 @@ public class ReportController extends BaseController {
         if (andCond) {
           url += "&";
         }
-        url += PeriodEndParamName + "=le" + periodEndDate;
+        url += PERIOD_END_PARAM_NAME + "=le" + periodEndDate;
         andCond = true;
       }
       if (docStatus != null) {
@@ -1067,226 +1111,6 @@ public class ReportController extends BaseController {
     }
 
     return reportBundle;
-  }
-
-  /**
-   * Retrieves the DocumentReference and MeasureReport, ensures that each of the excluded Patients in the request
-   * are listed in the MeasureReport.evaluatedResources or as "excluded" extensions on the MeasureReport. Creates
-   * the excluded extension on the MR for each patient, DELETE's each patient. Re-evaluates the MeasureReport against
-   * the Measure. Increments the minor version number of the report in DocumentReference. Stores updates to the
-   * DR and MR back to the FHIR server.
-   *
-   * @param authentication   Authentication information to create an IGenericClient to the internal FHIR store
-   * @param request          The HTTP request to create an IGenericClient to the internal FHIR store
-   * @param user             The user making the request, for the audit trail
-   * @param reportId         The ID of the report to re-evaluate after DELETE'ing/excluding the patients.
-   * @param excludedPatients A list of patients to be excluded from the report, including reasons for their exclusion
-   * @return A ReportModel that has been updated to reflect the exclusions
-   */
-  @PostMapping("/{reportId}/$exclude")
-  public ReportModel excludePatients(
-          Authentication authentication,
-          HttpServletRequest request,
-          @AuthenticationPrincipal LinkCredentials user,
-          @PathVariable("reportId") String reportId,
-          @RequestBody List<ExcludedPatientModel> excludedPatients) throws Exception {
-
-    DocumentReference reportDocRef = this.getFhirDataProvider().findDocRefForReport(ReportIdHelper.getMasterIdentifierValue(reportId));
-
-    if (reportDocRef == null) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, String.format("Report %s not found", reportId));
-    }
-
-    if (excludedPatients == null || excludedPatients.size() == 0) {
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No exclusions specified");
-    }
-
-
-    /* ALM 11May2023 from what I have seen in report generation MeasureReports will NEVER exist with just the Report Id
-    playing around pulling by masterId and measure hash (THSAMeasure)
-     */
-
-    Measure measure = null;
-    MeasureReport measureReport = null;
-    Bundle measureBundle = null;
-    for (int i = 0; i < reportDocRef.getIdentifier().size(); i++) {
-      String encodedReport = "";
-      try {
-        encodedReport = Helper.encodeForUrl(ReportIdHelper.getMasterMeasureReportId(reportId, reportDocRef.getIdentifier().get(i).getValue()));
-        measureBundle =  this.getFhirDataProvider().getBundleById(reportDocRef.getIdentifier().get(i).getValue());
-        measureReport = this.getFhirDataProvider().getMeasureReportById(encodedReport);
-        measure = FhirHelper.getMeasure(measureBundle);
-        break;
-      } catch (Exception ex) {
-        logger.error(ex.getMessage());
-      }
-    }
-
-    List<String> bundleIds = reportDocRef.getIdentifier().stream().map(identifier -> identifier.getValue()).collect(Collectors.toList());
-
-    if (measure == null) {
-      throw new ResponseStatusException(HttpStatus.NOT_FOUND, String.format("The measure for report %s was not found or no longer exists on the system", reportId));
-    }
-
-    Bundle excludeChangesBundle = new Bundle();
-    excludeChangesBundle.setType(Bundle.BundleType.TRANSACTION);
-    Boolean changedMeasureReport = false;
-
-    for (ExcludedPatientModel excludedPatient : excludedPatients) {
-      if (StringUtils.isEmpty(excludedPatient.getPatientId())) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format("Patient ID not provided for all exclusions"));
-      }
-
-      if (excludedPatient.getReason() == null || excludedPatient.getReason().isEmpty()) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format("Excluded patient ID %s does not specify a reason", excludedPatient.getPatientId()));
-      }
-
-      // Find any references to the Patient in the MeasureReport.evaluatedResources
-      List<Reference> foundEvaluatedPatient = measureReport.getEvaluatedResource().stream()
-              .filter(er -> er.getReference() != null && er.getReference().equals("Patient/" + excludedPatient.getPatientId()))
-              .collect(Collectors.toList());
-      // Find any extensions that list the Patient has already being excluded
-      Boolean foundExcluded = measureReport.getExtension().stream()
-              .filter(e -> e.getUrl().equals(Constants.ExcludedPatientExtUrl))
-              .anyMatch(e -> e.getExtension().stream()
-                      .filter(nextExt -> nextExt.getUrl().equals("patient") && nextExt.getValue() instanceof Reference)
-                      .anyMatch(nextExt -> {
-                        Reference patientRef = (Reference) nextExt.getValue();
-                        return patientRef.getReference().equals("Patient/" + excludedPatient.getPatientId());
-                      }));
-
-      // Throw an error if the Patient does not show up in either evaluatedResources or the excluded extensions
-      //Commented out until CQF ruler is fixed
-      /*if (foundEvaluatedPatient.size() == 0 && !foundExcluded) {
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format("Patient %s is not included in report %s", excludedPatient.getPatientId(), reportId));
-      }*/
-
-      // Create an extension for the excluded patient on the MeasureReport
-      //Commented out until CQF ruler is fixed
-      /*if (!foundExcluded) {
-        Extension newExtension = new Extension(Constants.ExcludedPatientExtUrl);
-        newExtension.addExtension("patient", new Reference("Patient/" + excludedPatient.getPatientId()));
-        newExtension.addExtension("reason", excludedPatient.getReason());
-        measureReport.addExtension(newExtension);
-        changedMeasureReport = true;
-
-        // Remove the patient from evaluatedResources, or HAPI will throw a referential integrity exception since it's getting (or has been) deleted
-        if (foundEvaluatedPatient.size() > 0) {
-          foundEvaluatedPatient.forEach(ep -> measureReport.getEvaluatedResource().remove(ep));
-        }
-      }*/
-
-      logger.debug(String.format("Checking if patient %s has been deleted already", excludedPatient.getPatientId()));
-
-      try {
-        // Try to GET the patient to see if it has already been deleted or not
-        this.getFhirDataProvider().tryGetResource("Patient", excludedPatient.getPatientId());
-        logger.debug(String.format("Adding patient %s to list of patients to delete", excludedPatient.getPatientId()));
-
-        // Add a "DELETE" request to the bundle, since it hasn't been deleted
-        Bundle.BundleEntryRequestComponent deleteRequest = new Bundle.BundleEntryRequestComponent()
-                .setUrl("Patient/" + excludedPatient.getPatientId())
-                .setMethod(Bundle.HTTPVerb.DELETE);
-        excludeChangesBundle.addEntry().setRequest(deleteRequest);
-      } catch (Exception ex) {
-        // It's been deleted, just log some debugging info
-        logger.debug(String.format("During exclusions for report %s, patient %s is already deleted.", reportId, excludedPatient.getPatientId()));
-      }
-    }
-
-    if (changedMeasureReport) {
-      Bundle.BundleEntryRequestComponent updateMeasureReportReq = new Bundle.BundleEntryRequestComponent()
-              .setUrl("MeasureReport/" + reportId)
-              .setMethod(Bundle.HTTPVerb.PUT);
-      excludeChangesBundle.addEntry()
-              .setRequest(updateMeasureReportReq)
-              .setResource(measureReport);
-    }
-
-    if (excludeChangesBundle.getEntry().size() > 0) {
-      logger.debug(String.format("Executing transaction update bundle to delete patients and/or update MeasureReport %s", reportId));
-
-      this.getFhirDataProvider().transaction(excludeChangesBundle);
-    }
-
-    // Create ReportCriteria to be used by MeasureEvaluator
-    ReportCriteria criteria = new ReportCriteria(
-            bundleIds,
-            reportDocRef.getContext().getPeriod().getStartElement().asStringValue(),
-            reportDocRef.getContext().getPeriod().getEndElement().asStringValue());
-
-    // Create ReportContext to be used by MeasureEvaluator
-    ReportContext reportContext = new ReportContext(this.getFhirDataProvider());
-    reportContext.setRequest(request);
-    reportContext.setUser(user);
-    reportContext.setMasterIdentifierValue(reportId);
-    ReportContext.MeasureContext measureContext = new ReportContext.MeasureContext();
-    //measureContext.setBundleId(reportDefIdentifier); // this was commented out.
-    // TODO: Set report def bundle on measure context
-    measureContext.setReportDefBundle(measureBundle);
-    measureContext.setMeasure(measure);
-    measureContext.setReportId(measureReport.getIdElement().getIdPart());
-    reportContext.getMeasureContexts().add(measureContext);
-
-    logger.debug("Re-evaluating measure with state of data on FHIR server");
-
-    List<String> excludedPatientReportIds = excludedPatients.stream().map(
-            patient -> ReportIdHelper.getPatientMeasureReportId(reportId, patient.getPatientId())).collect(Collectors.toList());
-
-    Set<String> reportRefs = measureReport.getContained().stream().map(list -> (ListResource) list).flatMap(list -> list.getEntry().stream().map(
-            entry -> entry.getItem().getReference().substring(entry.getItem().getReference().indexOf("/") + 1))).collect(Collectors.toSet());
-
-    measureContext.setPatientReports(reportRefs.stream().filter(ref -> !excludedPatientReportIds.contains(ref)).map(ref -> {
-      MeasureReport patientReport = this.getFhirDataProvider().getMeasureReportById(ref); return patientReport;
-    }).collect(Collectors.toList()));
-
-    String reportAggregatorClassName = FhirHelper.getReportAggregatorClassName(config, measureBundle);
-    IReportAggregator reportAggregator = (IReportAggregator) context.getBean(Class.forName(reportAggregatorClassName));
-    MeasureReport updatedMeasureReport = reportAggregator.generate(criteria, reportContext, measureContext, config);
-
-    updatedMeasureReport.setId(reportId);
-    updatedMeasureReport.setExtension(measureReport.getExtension());    // Copy extensions from the original report before overwriting
-
-    // Increment the version of the report
-    FhirHelper.incrementMinorVersion(reportDocRef);
-
-    logger.debug(String.format("Updating DocumentReference and MeasureReport for report %s", reportId));
-
-    // Create a bundle transaction to update the DocumentReference and MeasureReport
-    Bundle reportUpdateBundle = new Bundle();
-    reportUpdateBundle.setType(Bundle.BundleType.TRANSACTION);
-    reportUpdateBundle.addEntry()
-            .setRequest(
-                    new Bundle.BundleEntryRequestComponent()
-                            .setUrl("MeasureReport/" + updatedMeasureReport.getIdElement().getIdPart())
-                            .setMethod(Bundle.HTTPVerb.PUT))
-            .setResource(updatedMeasureReport);
-    reportUpdateBundle.addEntry()
-            .setRequest(
-                    new Bundle.BundleEntryRequestComponent()
-                            .setUrl("DocumentReference/" + reportDocRef.getIdElement().getIdPart())
-                            .setMethod(Bundle.HTTPVerb.PUT))
-            .setResource(reportDocRef);
-
-    // Execute the update transaction bundle for MeasureReport and DocumentReference
-    this.getFhirDataProvider().transaction(reportUpdateBundle);
-
-    // Record an audit event that the report has had exclusions
-    // TODO: Austin to create Task for this call and uncomment audit below
-    //this.getFhirDataProvider().audit(request, user.getJwt(), FhirHelper.AuditEventTypes.ExcludePatients, String.format("Excluded %s patients from report %s", excludedPatients.size(), reportId));
-
-    // Create the ReportModel that will be returned
-    ReportModel report = new ReportModel();
-//    report.setMeasureReport(updatedMeasureReport);
-//    report.setMeasure(measure);
-//    report.setIdentifier(reportId);
-    report.setVersion(reportDocRef
-            .getExtensionByUrl(Constants.DocumentReferenceVersionUrl) != null ?
-            reportDocRef.getExtensionByUrl(Constants.DocumentReferenceVersionUrl).getValue().toString() : null);
-    report.setStatus(reportDocRef.getDocStatus().toString());
-    report.setDate(reportDocRef.getDate());
-
-    return report;
   }
 
   /**
