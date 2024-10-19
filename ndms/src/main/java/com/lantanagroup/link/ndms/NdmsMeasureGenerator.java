@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.ParseException;
@@ -137,8 +136,8 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
                         reportContext.getFhirProvider().updateResource(patientMeasureReport);
                         stopwatch.stop();
 
-                        // Add Address (for Organization) to MeasureReport
-                        patientMeasureReport.addExtension(reportContext.getOrganizationExtensionForMeasureReport());
+                        // Add Organization Info to MeasureReport
+                        ndmsUtility.addOrganizationToMeasureReport(patientMeasureReport, reportContext.getReportOrganization());
 
                         return patientMeasureReport;
                     }).collect(Collectors.toList())).get();
@@ -152,8 +151,8 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
         }
         MeasureReport masterMeasureReport = reportAggregator.generate(criteria, reportContext, measureContext, config);
 
-        // Add Address (for Organization) to MeasureReport
-        masterMeasureReport.addExtension(reportContext.getOrganizationExtensionForMeasureReport());
+        // Add  Organization Information to MeasureReport
+        ndmsUtility.addOrganizationToMeasureReport(masterMeasureReport, reportContext.getReportOrganization());
 
         measureContext.setMeasureReport(masterMeasureReport);
 

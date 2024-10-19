@@ -1,10 +1,11 @@
 package com.lantanagroup.link.ndms;
 
+import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.FhirDataProvider;
-import org.hl7.fhir.r4.model.CodeableConcept;
-import org.hl7.fhir.r4.model.Coding;
-import org.hl7.fhir.r4.model.ConceptMap;
-import org.hl7.fhir.r4.model.Extension;
+import org.hl7.fhir.exceptions.FHIRException;
+import org.hl7.fhir.r4.model.*;
+
+import java.util.List;
 
 public class NdmsUtility {
     private ConceptMap trac2esNdmsConceptMap;
@@ -19,6 +20,56 @@ public class NdmsUtility {
 
     public CodeableConcept getOccPopulationCodeByTrac2es(String evaluationServiceLocation, String conceptMapLocation, String trac2esCode) {
         return getPopulationCodeByTrac2es(evaluationServiceLocation, conceptMapLocation, trac2esCode, "occupied");
+    }
+
+    public Address getFirstAddressWithGeoLocation(List<Address> addresses) {
+        for (Address address : addresses) {
+            for (Extension extension : address.getExtension()) {
+                if (extension.getUrl().equals(Constants.FHIR_GEOLOCATION_URL)) {
+                    return address;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public Extension getGeoLocationAddressExtension(Organization organization) {
+        Extension addressExtension = new Extension();
+        addressExtension.setUrl("https://hl7.org/fhir/StructureDefinition/Address");
+
+        addressExtension.setValue(
+                getFirstAddressWithGeoLocation(organization.getAddress())
+        );
+
+        if (!addressExtension.hasValue()) {
+            throw new FHIRException(String.format("Report Context Organization (%s) does not contain necessary geo location", organization.getId()));
+        }
+
+        return addressExtension;
+    }
+
+    public void addOrganizationToMeasureReport(MeasureReport measureReport, Organization organization) {
+        // Add Reference extension pointing to Organization
+        Extension extension = getReferenceExtension(organization);
+        measureReport.addExtension(extension);
+
+        // Add Address w/ GeoLocation as Extension to Organization
+        extension = getGeoLocationAddressExtension(organization);
+        measureReport.addExtension(extension);
+    }
+
+    public Extension getReferenceExtension(Organization organization) {
+        Extension extension = new Extension();
+        extension.setUrl("https://hl7.org/fhir/StructureDefinition/Reference");
+
+        Reference reference = new Reference();
+        reference.setReference(String.format("%s/%s", organization.getClass().getSimpleName(), organization.getIdElement().getIdPart()));
+        reference.setDisplay(organization.getName());
+
+        extension.setValue(reference);
+
+        return extension;
     }
 
     private CodeableConcept getPopulationCodeByTrac2es(String evaluationServiceLocation, String conceptMapLocation, String trac2esCode, String extensionValue) {
