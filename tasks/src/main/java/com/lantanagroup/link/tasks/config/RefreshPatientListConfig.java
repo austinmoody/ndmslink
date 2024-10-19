@@ -36,9 +36,8 @@ public class RefreshPatientListConfig {
     @Setter
     public static class PatientList {
         @NotBlank
-        private String patientListPath;
-        @NotNull
-        @Size(min = 1)
-        private List<@NotBlank String> censusIdentifier;
+        private String patientListIdentifier;
+        @NotBlank
+        private String patientListOrganization;
     }
 }
