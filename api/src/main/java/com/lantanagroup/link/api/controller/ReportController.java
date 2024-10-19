@@ -408,13 +408,10 @@ public class ReportController extends BaseController {
         IReportAggregator reportAggregator = (IReportAggregator) context.getBean(Class.forName(reportAggregatorClassName));
 
         String measureGeneratorClassName = FhirHelper.getMeasureGeneratorClassName(config, measureContext.getReportDefBundle());
-        IMeasureGenerator measureGenerator = (IMeasureGenerator) context.getBean(Class.forName(measureGeneratorClassName));
-
-        //ReportGenerator generator = new ReportGenerator(this.stopwatchManager, reportContext, measureContext, criteria, config, user, reportAggregator);
+        IMeasureReportGenerator measureGenerator = (IMeasureReportGenerator) context.getBean(Class.forName(measureGeneratorClassName));
 
         this.eventService.triggerEvent(EventTypes.BeforeMeasureEval, criteria, reportContext, measureContext);
 
-        //generator.generate();
         measureGenerator.generate(this.stopwatchManager, reportContext, measureContext, criteria, config, user, reportAggregator);
 
         this.eventService.triggerEvent(EventTypes.AfterMeasureEval, criteria, reportContext, measureContext);
@@ -465,7 +462,7 @@ public class ReportController extends BaseController {
       note.setText("Done generating report.");
       task.addNote(note);
     } catch (Exception ex) {
-      String errorMessage = String.format("Issue with report generation: %s", ex.getMessage());
+      String errorMessage = String.format("Issue with report generation: (%s) %s", ex.getClass().getSimpleName(),ex.getMessage());
       logger.error(errorMessage);
       Annotation note = new Annotation();
       note.setText(errorMessage);

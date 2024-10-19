@@ -16,8 +16,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.stream.Collectors;
 
-public class ThsaMeasureGenerator  implements IMeasureGenerator {
-    private static final Logger logger = LoggerFactory.getLogger(ThsaMeasureGenerator.class);
+public class ThsaMeasureReportGenerator implements IMeasureReportGenerator {
+    private static final Logger logger = LoggerFactory.getLogger(ThsaMeasureReportGenerator.class);
     @Override
     public void generate(StopwatchManager stopwatchManager,
                          ReportContext reportContext,

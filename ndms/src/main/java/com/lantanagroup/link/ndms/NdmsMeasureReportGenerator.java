@@ -22,8 +22,8 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.stream.Collectors;
 
 @Component
-public class NdmsMeasureGenerator implements IMeasureGenerator {
-    private static final Logger logger = LoggerFactory.getLogger(NdmsMeasureGenerator.class);
+public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
+    private static final Logger logger = LoggerFactory.getLogger(NdmsMeasureReportGenerator.class);
 
     private CodeSystem trac2esCodeSystem = null;
     private final NdmsUtility ndmsUtility = new NdmsUtility();

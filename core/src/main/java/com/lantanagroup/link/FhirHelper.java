@@ -526,8 +526,8 @@ public class FhirHelper {
       return bundleId.equalsIgnoreCase(reportDefBundle.getIdElement().getIdPart());
     }).findFirst();
 
-    if (apiReportDefsBundleConfig.isPresent() && !StringUtils.isEmpty(apiReportDefsBundleConfig.get().getMeasureGenerator())) {
-      measureGeneratorClassName = apiReportDefsBundleConfig.get().getMeasureGenerator();
+    if (apiReportDefsBundleConfig.isPresent() && !StringUtils.isEmpty(apiReportDefsBundleConfig.get().getReportGenerator())) {
+      measureGeneratorClassName = apiReportDefsBundleConfig.get().getReportGenerator();
     } else {
       throw new IllegalArgumentException("Could not find a measure generator class for report definition bundle " + reportDefBundle.getIdElement());
     }
