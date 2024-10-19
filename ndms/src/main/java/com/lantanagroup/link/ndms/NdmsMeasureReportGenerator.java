@@ -22,8 +22,8 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.stream.Collectors;
 
 @Component
-public class NdmsMeasureGenerator implements IMeasureGenerator {
-    private static final Logger logger = LoggerFactory.getLogger(NdmsMeasureGenerator.class);
+public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
+    private static final Logger logger = LoggerFactory.getLogger(NdmsMeasureReportGenerator.class);
 
     private CodeSystem trac2esCodeSystem = null;
     private final NdmsUtility ndmsUtility = new NdmsUtility();
@@ -136,6 +136,9 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
                         reportContext.getFhirProvider().updateResource(patientMeasureReport);
                         stopwatch.stop();
 
+                        // Add Organization Info to MeasureReport
+                        ndmsUtility.addOrganizationToMeasureReport(patientMeasureReport, reportContext.getReportOrganization());
+
                         return patientMeasureReport;
                     }).collect(Collectors.toList())).get();
             // to avoid thread collision remove saving the patientMeasureReport on the FhirServer from the above parallelStream
@@ -147,6 +150,13 @@ public class NdmsMeasureGenerator implements IMeasureGenerator {
             }
         }
         MeasureReport masterMeasureReport = reportAggregator.generate(criteria, reportContext, measureContext, config);
+
+        // Add  Organization Information to MeasureReport
+        ndmsUtility.addOrganizationToMeasureReport(masterMeasureReport, reportContext.getReportOrganization());
+
+        // Tag "Master" MeasureReport
+        masterMeasureReport.getMeta().addTag(Constants.NDMS_AGGREGATE_MEASURE_REPORT);
+
         measureContext.setMeasureReport(masterMeasureReport);
 
     }

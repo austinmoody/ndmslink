@@ -1,7 +1,5 @@
 package com.lantanagroup.link.cli;
 
-import ca.uhn.fhir.context.FhirContext;
-import com.lantanagroup.link.FhirContextProvider;
 import com.lantanagroup.link.config.query.QueryConfig;
 import com.lantanagroup.link.query.auth.EpicAuth;
 import com.lantanagroup.link.query.auth.EpicAuthConfig;
@@ -17,9 +15,6 @@ import java.util.List;
 @ShellComponent
 public class RefreshPatientListCommand extends BaseShellCommand {
   private static final Logger logger = LoggerFactory.getLogger(RefreshPatientListCommand.class);
-  private final FhirContext fhirContext = FhirContextProvider.getFhirContext();
-  private RefreshPatientListConfig config;
-  private QueryConfig queryConfig;
 
   @Override
   protected List<Class<?>> getBeanClasses() {
@@ -34,13 +29,15 @@ public class RefreshPatientListCommand extends BaseShellCommand {
           key = "refresh-patient-list",
           value = "Read patient lists and update the corresponding census in Link.")
   public void execute() throws Exception {
+    RefreshPatientListConfig config;
+    QueryConfig queryConfig;
 
     try {
       registerBeans();
       config = applicationContext.getBean(RefreshPatientListConfig.class);
       queryConfig = applicationContext.getBean(QueryConfig.class);
 
-      RefreshPatientListTask.RunRefreshPatientList(config, queryConfig, applicationContext);
+      RefreshPatientListTask.runRefreshPatientList(config, queryConfig, applicationContext);
 
     } catch (Exception ex) {
       logger.error("RefreshPatientListCommand error: {}", ex.getMessage());

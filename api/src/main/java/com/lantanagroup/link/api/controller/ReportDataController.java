@@ -457,7 +457,7 @@ public class ReportDataController extends BaseController {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errorMessage);
       }
 
-      ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getPeriodStart(), input.getPeriodEnd());
+      ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getOrganizationId(), input.getPeriodStart(), input.getPeriodEnd());
 
       ReportContext reportContext = new ReportContext(this.getFhirDataProvider());
       reportContext.setRequest(request);

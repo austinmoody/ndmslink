@@ -10,6 +10,7 @@ import com.lantanagroup.link.model.Job;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
 import com.opencsv.exceptions.CsvValidationException;
+import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,7 +137,7 @@ public class PatientIdentifierController extends BaseController {
       }
 
       ListResource list = parser.parseResource(ListResource.class, receivedBody);
-      checkMeasureIdentifier(list);
+      checkListOrganization(list);
       receiveFHIR(list);
 
       logger.info("Patient List Processing Complete (Task ID: {})", taskId);
@@ -160,6 +161,35 @@ public class PatientIdentifierController extends BaseController {
     }
   }
 
+  private void checkListOrganization(ListResource listResource) {
+    if (listResource.getIdentifier().isEmpty()) {
+      String errorMessage = String.format("Patient List %s is missing identifier", listResource.getIdentifier());
+      logger.error(errorMessage);
+      throw new FHIRException(errorMessage);
+    }
+
+    Identifier listOrganizationIdentifier = null;
+    for (Identifier identifier : listResource.getIdentifier()) {
+      if (identifier.getSystem().equals(Constants.MainSystem)) {
+        listOrganizationIdentifier = identifier;
+      }
+    }
+    if (listOrganizationIdentifier == null) {
+      String errorMessage = String.format("Patient List %s is missing identifier associated with system '%s'", listResource.getId(), Constants.MainSystem);
+      logger.error(errorMessage);
+      throw new FHIRException(errorMessage);
+    }
+
+    FhirDataProvider dataStore = new FhirDataProvider(config.getDataStore());
+    Organization listOrganization = dataStore.getOrganizationById(listOrganizationIdentifier.getValue());
+    if (listOrganization == null) {
+      String errorMessage = String.format("List Organization with id '%s' was not found on Data Store '%s'", listOrganizationIdentifier.getValue(), config.getDataStore().getBaseUrl());
+      logger.error(errorMessage);
+      throw new FHIRException(errorMessage);
+    }
+  }
+
+  // TODO: Remove this
   private void checkMeasureIdentifier(ListResource list) {
     if (list.getIdentifier().isEmpty()) {
       String msg = "Census list should have an identifier.";

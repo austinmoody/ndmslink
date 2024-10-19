@@ -4,7 +4,6 @@ import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.gclient.*;
 import com.lantanagroup.link.FhirDataProvider;
 import com.lantanagroup.link.StopwatchManager;
-import com.lantanagroup.link.config.api.ApiDataStoreConfig;
 import com.lantanagroup.link.config.query.QueryConfig;
 import com.lantanagroup.link.config.query.USCoreConfig;
 import com.lantanagroup.link.config.query.USCoreOtherResourceTypeConfig;
@@ -244,7 +243,7 @@ public class QueryTests {
 
     // Execute the query
     Query theQuery = new Query();
-    ReportCriteria criteria = new ReportCriteria(List.of(), null, null);
+    ReportCriteria criteria = new ReportCriteria(List.of(), null, null, null);
     ReportContext context = new ReportContext(new FhirDataProvider(fhirQueryClient));
     theQuery.setApplicationContext(applicationContext);
     theQuery.setFhirQueryClient(fhirQueryClient);

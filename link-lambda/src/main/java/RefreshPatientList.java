@@ -48,7 +48,7 @@ public class RefreshPatientList implements RequestHandler<Void,String> {
             config.setApiUrl(apiUrl);
             config.setAuth(authConfig);
 
-            RefreshPatientListTask.RunRefreshPatientList(config, queryConfig, epicAuthConfig);
+            RefreshPatientListTask.runRefreshPatientList(config, queryConfig, epicAuthConfig);
 
             logger.info("RefreshPatientList Lambda - Completed");
 
@@ -76,15 +76,9 @@ public class RefreshPatientList implements RequestHandler<Void,String> {
                 JSONObject patientListObject = (JSONObject) listObject;
 
                 RefreshPatientListConfig.PatientList list = new RefreshPatientListConfig.PatientList();
-                list.setPatientListPath(patientListObject.getString("patient-list-path"));
+                list.setPatientListIdentifier(patientListObject.getString("patient-list-path"));
 
-                List<String> censusIdentifiers = new ArrayList<>();
-                for (Object censusObject : patientListObject.getJSONArray("census-identifier")) {
-                    if (censusObject instanceof String) {
-                        censusIdentifiers.add(censusObject.toString());
-                    }
-                }
-                list.setCensusIdentifier(censusIdentifiers);
+                list.setPatientListOrganization("patient-list-organization");
                 patientLists.add(list);
             }
         }

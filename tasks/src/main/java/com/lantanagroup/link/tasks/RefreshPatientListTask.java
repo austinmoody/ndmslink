@@ -5,6 +5,7 @@ import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.api.ServerValidationModeEnum;
 import ca.uhn.fhir.rest.client.impl.BaseClient;
 import ca.uhn.fhir.rest.client.interceptor.AdditionalRequestHeadersInterceptor;
+import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.Constants;
@@ -19,6 +20,7 @@ import com.lantanagroup.link.query.auth.HapiFhirAuthenticationInterceptor;
 import com.lantanagroup.link.query.auth.ICustomAuthConfig;
 import com.lantanagroup.link.tasks.config.CensusReportingPeriods;
 import com.lantanagroup.link.tasks.config.RefreshPatientListConfig;
+import org.apache.http.HttpException;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
@@ -37,52 +39,35 @@ public class RefreshPatientListTask {
 
     private static final Logger logger = LoggerFactory.getLogger(RefreshPatientListTask.class);
 
-    public static void RunRefreshPatientList(RefreshPatientListConfig config, QueryConfig queryConfig, ICustomAuthConfig authConfig) throws Exception {
+    private RefreshPatientListTask() {}
 
-        try {
-            HapiFhirAuthenticationInterceptor interceptor = new HapiFhirAuthenticationInterceptor(queryConfig, authConfig);
-            execute(config, queryConfig, interceptor);
-        } catch (Exception ex) {
-            logger.error(ex.getMessage());
-            throw ex;
+    public static void runRefreshPatientList(RefreshPatientListConfig config, QueryConfig queryConfig, ICustomAuthConfig authConfig) throws Exception {
+        HapiFhirAuthenticationInterceptor interceptor = new HapiFhirAuthenticationInterceptor(queryConfig, authConfig);
+        execute(config, interceptor);
+    }
+
+    public static void runRefreshPatientList(RefreshPatientListConfig config, QueryConfig queryConfig, ApplicationContext applicationContext) throws Exception {
+        HapiFhirAuthenticationInterceptor interceptor = new HapiFhirAuthenticationInterceptor(queryConfig, applicationContext);
+        execute(config, interceptor);
+    }
+
+    private static void execute(RefreshPatientListConfig config, HapiFhirAuthenticationInterceptor interceptor) throws Exception {
+        List<RefreshPatientListConfig.PatientList> filteredList = config.getPatientList();
+
+        for (RefreshPatientListConfig.PatientList listResource : filteredList) {
+            logger.info("Reading List - {}", listResource.getPatientListIdentifier());
+            ListResource source = readList(config, listResource.getPatientListIdentifier(), interceptor);
+            logger.info("List has {} items", source.getEntry().size());
+            ListResource target = transformList(config, source, listResource.getPatientListOrganization());
+            updateList(config, target);
         }
     }
 
-    public static void RunRefreshPatientList(RefreshPatientListConfig config, QueryConfig queryConfig, ApplicationContext applicationContext) throws Exception {
-        try {
-            HapiFhirAuthenticationInterceptor interceptor = new HapiFhirAuthenticationInterceptor(queryConfig, applicationContext);
-            execute(config, queryConfig, interceptor);
-        } catch (Exception ex) {
-            logger.error(ex.getMessage());
-            throw ex;
-        }
-    }
-
-    private static void execute(RefreshPatientListConfig config, QueryConfig queryConfig, HapiFhirAuthenticationInterceptor interceptor) throws Exception {
-        try {
-            List<RefreshPatientListConfig.PatientList> filteredList = config.getPatientList();
-
-            for (RefreshPatientListConfig.PatientList listResource : filteredList) {
-                logger.info("Reading List - {}", listResource.getPatientListPath());
-                ListResource source = readList(config, listResource.getPatientListPath(), interceptor);
-                logger.info("List has {} items", source.getEntry().size());
-                for (int j = 0; j < listResource.getCensusIdentifier().size(); j++) {
-                    ListResource target = transformList(config, source, listResource.getCensusIdentifier().get(j));
-                    updateList(config, target);
-                }
-            }
-        } catch (Exception ex) {
-            logger.error(ex.getMessage());
-            throw ex;
-        }
-    }
-
-    private static ListResource readList(RefreshPatientListConfig config, String patientListId, HapiFhirAuthenticationInterceptor interceptor) throws ClassNotFoundException {
+    private static ListResource readList(RefreshPatientListConfig config, String patientListId, HapiFhirAuthenticationInterceptor interceptor) {
 
         System.setProperty("ca.uhn.fhir.parser.stax", "com.ctc.wstx.stax.WstxInputFactory");
         FhirContext fhirContext = FhirContext.forR4();
 
-        //FhirContext fhirContext = FhirContextProvider.getFhirContext();
         fhirContext.getRestfulClientFactory().setServerValidationMode(ServerValidationModeEnum.NEVER);
 
         AdditionalRequestHeadersInterceptor headersInterceptor = new AdditionalRequestHeadersInterceptor();
@@ -95,7 +80,7 @@ public class RefreshPatientListTask {
         client.registerInterceptor(interceptor);
         client.registerInterceptor(headersInterceptor);
 
-        ListResource r = client.fetchResourceFromUrl(ListResource.class, patientListId);
+        ListResource r = client.fetchResourceFromUrl(ListResource.class, String.format("List/%s",patientListId));
         if (r != null) {
             return r;
         } else {
@@ -103,7 +88,7 @@ public class RefreshPatientListTask {
         }
     }
 
-    private static ListResource transformList(RefreshPatientListConfig config, ListResource source, String censusIdentifier) throws URISyntaxException {
+    private static ListResource transformList(RefreshPatientListConfig config, ListResource source, String listOrganization) throws URISyntaxException {
         logger.info("Transforming List");
         ListResource target = new ListResource();
         Period period = new Period();
@@ -125,10 +110,10 @@ public class RefreshPatientListTask {
         target.addExtension(Constants.ApplicablePeriodExtensionUrl, period);
         target.addIdentifier()
                 .setSystem(Constants.MainSystem)
-                .setValue(censusIdentifier);
+                .setValue(listOrganization);
         target.setStatus(ListResource.ListStatus.CURRENT);
         target.setMode(ListResource.ListMode.WORKING);
-        target.setTitle(String.format("Census List for %s", censusIdentifier));
+        target.setTitle(String.format("Patient List for %s", listOrganization));
         target.setCode(source.getCode());
         target.setDate(source.getDate());
         URI baseUrl = new URI(config.getFhirServerBase());
@@ -161,10 +146,10 @@ public class RefreshPatientListTask {
             String token = OAuth2Helper.getToken(config.getAuth());
 
             if (token == null) {
-                throw new Exception("Authorization failed");
+                throw new AuthenticationException("Authorization failed");
             }
 
-            if (OAuth2Helper.validateHeaderJwtToken(token)) {
+            if (Boolean.TRUE.equals(OAuth2Helper.validateHeaderJwtToken(token))) {
                 request.addHeader(HttpHeaders.AUTHORIZATION, String.format("Bearer %s", token));
             } else {
                 throw new JWTVerificationException("Invalid token format");
@@ -180,7 +165,7 @@ public class RefreshPatientListTask {
 
         if (response.getResponseCode() != 200) {
             // Didn't get success status from API
-            throw new Exception(String.format("Expecting HTTP Status Code 200 from API, received %s", response.getResponseCode()));
+            throw new HttpException(String.format("Expecting HTTP Status Code 200 from API, received %s", response.getResponseCode()));
         }
         ObjectMapper mapper = new ObjectMapper();
         Job job = mapper.readValue(response.getResponseBody(), Job.class);
