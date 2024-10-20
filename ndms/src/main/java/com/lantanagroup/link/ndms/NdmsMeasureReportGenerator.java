@@ -191,14 +191,38 @@ public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
 
     private Optional<NhsnLocation> getNhsnLocation(List<NhsnLocation> nhsnLocations, List<String> aliases) {
 
-        List<NhsnLocation> locationsByUnitLabel = nhsnLocations.stream()
+        // TODO: Need to verify this mapping w/ NDMS
+        // At first I was looking first for one of the aliases in the "Unit Label" column.
+        // Then for those returned columns further looking for one of the aliases in the
+        // "Your Code" column.  Digging around in Bellevue data on 20-Oct-2024 it almost
+        // appears that it could be an either or situation?  So the commented out code
+        // below is from pre 20-October-2024.  Now going to try either Unit Label or
+        // Your Code.
+//        List<NhsnLocation> locationsByUnitLabel = nhsnLocations.stream()
+//                .filter(location -> aliases.contains(location.getUnit()))
+//                .collect(Collectors.toList());
+//
+//        if (!locationsByUnitLabel.isEmpty()) {
+//            return locationsByUnitLabel.stream()
+//                    .filter(location -> aliases.contains(location.getCode()))
+//                    .findFirst();
+//        }
+
+
+        List<NhsnLocation> byUnit = nhsnLocations.stream()
                 .filter(location -> aliases.contains(location.getUnit()))
                 .collect(Collectors.toList());
 
-        if (!locationsByUnitLabel.isEmpty()) {
-            return locationsByUnitLabel.stream()
-                    .filter(location -> aliases.contains(location.getCode()))
-                    .findFirst();
+        List<NhsnLocation> byCode = nhsnLocations.stream()
+                .filter(location -> aliases.contains(location.getCode()))
+                .collect(Collectors.toList());
+
+        if (!byCode.isEmpty()) {
+            return Optional.of(byCode.get(0));
+        }
+
+        if (!byUnit.isEmpty()) {
+            return Optional.of(byUnit.get(0));
         }
 
         return Optional.empty();
