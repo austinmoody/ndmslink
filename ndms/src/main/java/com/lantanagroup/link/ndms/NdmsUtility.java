@@ -54,7 +54,7 @@ public class NdmsUtility {
         Extension extension = getReferenceExtension(organization);
         measureReport.addExtension(extension);
 
-        // Add Address w/ GeoLocation as Extension to Organization
+        // Add Address w/ GeoLocation as Extension to MeasureReport
         extension = getGeoLocationAddressExtension(organization);
         measureReport.addExtension(extension);
 
