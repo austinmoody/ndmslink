@@ -4,7 +4,6 @@ import ca.uhn.fhir.model.api.TemporalPrecisionEnum;
 import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.*;
 import com.lantanagroup.link.auth.LinkCredentials;
-import com.lantanagroup.link.config.api.ApiMeasurePackage;
 import com.lantanagroup.link.config.query.QueryConfig;
 import com.lantanagroup.link.config.query.USCoreConfig;
 import com.lantanagroup.link.model.*;
@@ -134,25 +133,23 @@ public class ReportController extends BaseController {
         }
       }
     } else {
-      IPatientIdProvider provider;
+      IPatientOfInterest provider;
       Class<?> patientIdResolverClass = Class.forName(this.config.getPatientIdResolver());
       Constructor<?> patientIdentifierConstructor = patientIdResolverClass.getConstructor();
-      provider = (IPatientIdProvider) patientIdentifierConstructor.newInstance();
+      provider = (IPatientOfInterest) patientIdentifierConstructor.newInstance();
       patientOfInterestModelList = provider.getPatientsOfInterest(criteria, context, this.config);
     }
   }
 
   private void queryAndStorePatientData(List<String> resourceTypes, ReportCriteria criteria, ReportContext context) throws Exception {
     List<PatientOfInterestModel> patientsOfInterest = context.getPatientsOfInterest();
-    List<String> measureIds = context.getMeasureContexts().stream()
-            .map(measureContext -> measureContext.getMeasure().getIdentifierFirstRep().getValue())
-            .collect(Collectors.toList());
+    String measureId = context.getMeasureContext().getMeasure().getIdentifierFirstRep().getValue();
     try {
       // Get the data
       logger.info("Querying/scooping data for the patients: " + StringUtils.join(patientsOfInterest, ", "));
       QueryConfig queryConfig = this.context.getBean(QueryConfig.class);
       IQuery query = QueryFactory.getQueryInstance(this.context, queryConfig.getQueryClass());
-      query.execute(criteria, context, patientsOfInterest, context.getMasterIdentifierValue(), resourceTypes, measureIds);
+      query.execute(criteria, context, patientsOfInterest, context.getMasterIdentifierValue(), resourceTypes, measureId);
     } catch (Exception ex) {
       logger.error(String.format("Error scooping/storing data for the patients (%s)", StringUtils.join(patientsOfInterest, ", ")));
       throw ex;
@@ -217,7 +214,7 @@ public class ReportController extends BaseController {
     // We want to go ahead here and see if a report with the identifier this criteria would generate already
     // exists.  If so but the regenerate flag isn't set then we want to fail with a 409, which is the legacy
     // behavior expected by the Web component.
-    ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getLocationId(), input.getPeriodStart(), input.getPeriodEnd());
+    ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getLocationId(), input.getMeasureId(), input.getPeriodStart(), input.getPeriodEnd());
     String masterIdentifierValue = ReportIdHelper.getMasterIdentifierValue(criteria);
     // search by masterIdentifierValue to uniquely identify the document - searching by combination of identifiers could return multiple documents
     // like in the case one document contains the subset of identifiers of what other document contains
@@ -241,6 +238,7 @@ public class ReportController extends BaseController {
                     input.getPeriodStart(),
                     input.getPeriodEnd(),
                     input.isRegenerate(),
+                    input.getMeasureId(),
                     job.getId()
             )
     );
@@ -259,6 +257,7 @@ public class ReportController extends BaseController {
           String periodStart,
           String periodEnd,
           boolean regenerate,
+          String measureId,
           String taskId) throws Exception {
 
     GenerateResponse response = new GenerateResponse();
@@ -272,8 +271,9 @@ public class ReportController extends BaseController {
       // Add parameters used to generate report to Task
       Annotation note = new Annotation();
       note.setTime(new Date());
-      note.setText(String.format("Report being generated with paramters: Location - %s / periodStart - %s / periodEnd - %s / regenerate - %s / bundleIds - %s",
+      note.setText(String.format("Report being generated with paramters: Location - %s / Measure - %s / periodStart - %s / periodEnd - %s / regenerate - %s / bundleIds - %s",
               locationId,
+              measureId,
               periodStart,
               periodEnd,
               regenerate,
@@ -281,7 +281,7 @@ public class ReportController extends BaseController {
       task.addNote(note);
 
 
-      ReportCriteria criteria = new ReportCriteria(List.of(bundleIds), locationId, periodStart, periodEnd);
+      ReportCriteria criteria = new ReportCriteria(List.of(bundleIds), locationId, measureId, periodStart, periodEnd);
       ReportContext reportContext = new ReportContext(this.getFhirDataProvider());
 
       reportContext.setRequest(request);

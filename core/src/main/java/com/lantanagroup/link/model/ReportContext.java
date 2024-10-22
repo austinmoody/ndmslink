@@ -22,6 +22,7 @@ public class ReportContext {
   private List<ListResource> patientCensusLists = new ArrayList<>();
   private List<PatientOfInterestModel> patientsOfInterest = new ArrayList<>();
   private List<MeasureContext> measureContexts = new ArrayList<>();
+  private MeasureContext measureContext;
   private Location reportLocation;
 
   public ReportContext(FhirDataProvider fhirProvider) {

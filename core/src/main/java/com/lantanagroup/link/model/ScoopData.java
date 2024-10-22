@@ -5,7 +5,6 @@ import lombok.Setter;
 import org.hl7.fhir.r4.model.Annotation;
 
 import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotEmpty;
 import java.util.Date;
 
 @Getter
@@ -15,19 +14,21 @@ public class ScoopData {
     private String periodStart;
     @NotBlank(message = "Period End is required")
     private String periodEnd;
-    @NotEmpty(message = "At least one Bundle ID is required")
-    private String[] bundleIds;
     @NotBlank(message = "Location is required")
     private String locationId;
+    @NotBlank(message = "Measure is required")
+    private String measureId;
 
     public Annotation getAnnotation() {
         Annotation annotation = new Annotation();
         annotation.setTime(new Date());
-        annotation.setText(String.format("ScoopData parameters: Location - %s / periodStart - %s / periodEnd - %s / bundleIds - %s",
+        annotation.setText(String.format("ScoopData parameters: Location - %s / Measure - %s / periodStart - %s / periodEnd - %s",
                 locationId,
+                measureId,
                 periodStart,
-                periodEnd,
-                String.join(",", bundleIds)));
+                periodEnd
+                )
+        );
         return annotation;
     }
 }
