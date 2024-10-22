@@ -17,14 +17,14 @@ public class ScoopData {
     private String periodEnd;
     @NotEmpty(message = "At least one Bundle ID is required")
     private String[] bundleIds;
-    @NotBlank(message = "Organization is required")
-    private String organizationId;
+    @NotBlank(message = "Location is required")
+    private String locationId;
 
     public Annotation getAnnotation() {
         Annotation annotation = new Annotation();
         annotation.setTime(new Date());
-        annotation.setText(String.format("ScoopData parameters: Organization - %s / periodStart - %s / periodEnd - %s / bundleIds - %s",
-                organizationId,
+        annotation.setText(String.format("ScoopData parameters: Location - %s / periodStart - %s / periodEnd - %s / bundleIds - %s",
+                locationId,
                 periodStart,
                 periodEnd,
                 String.join(",", bundleIds)));

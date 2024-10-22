@@ -181,8 +181,8 @@ public class PatientScoop {
     // Tag the bundle as patient-data to be able to quickly look up any data that is related to a patient
     patientBundle.getMeta().addTag(Constants.MainSystem, Constants.patientDataTag, "Patient Data");
     
-    // Tag the bundle w/ the id of the Organization.  Only purpose is to be able to pull these for debugging purposes
-    patientBundle.getMeta().addTag(Constants.MainSystem, criteria.getOrganizationId(), criteria.getOrganizationId());
+    // Tag the bundle w/ the id of the Location.  Only purpose is to be able to pull these for debugging purposes
+    patientBundle.getMeta().addTag(Constants.MainSystem, criteria.getLocationId(), criteria.getLocationId());
 
     return patientBundle;
   }

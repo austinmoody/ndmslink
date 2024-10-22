@@ -205,6 +205,10 @@ public class FhirDataProvider {
     return this.client.read().resource(Organization.class).withId(organizationId).execute();
   }
 
+  public Location getLocationById(String locationId) {
+    return this.client.read().resource(Location.class).withId(locationId).execute();
+  }
+
   public MeasureReport getMeasureReportById(String reportId) {
 
     return this.client

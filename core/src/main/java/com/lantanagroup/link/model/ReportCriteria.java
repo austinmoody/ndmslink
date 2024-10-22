@@ -13,20 +13,20 @@ public class ReportCriteria {
   private final SortedSet<String> bundleIds;
   private final String periodStart;
   private final String periodEnd;
-  private final String organizationId;
+  private final String locationId;
 
-  public ReportCriteria(Collection<String> bundleIds, String organizatonId, String periodStart, String periodEnd) {
+  public ReportCriteria(Collection<String> bundleIds, String locationId, String periodStart, String periodEnd) {
     this.bundleIds = new TreeSet<>(bundleIds);
     this.periodStart = periodStart;
     this.periodEnd = periodEnd;
-    this.organizationId = organizatonId;
+    this.locationId = locationId;
   }
 
   public Annotation getAnnotation() {
     Annotation annotation = new Annotation();
     annotation.setTime(new Date());
-    annotation.setText(String.format("ReportCriteria parameters: Organization: %s / periodStart: %s / periodEnd: %s / bundleIds: %s",
-            this.organizationId,
+    annotation.setText(String.format("ReportCriteria parameters: Location: %s / periodStart: %s / periodEnd: %s / bundleIds: %s",
+            this.locationId,
             this.getPeriodStart(),
             this.getPeriodEnd(),
             String.join(",", this.getBundleIds())));

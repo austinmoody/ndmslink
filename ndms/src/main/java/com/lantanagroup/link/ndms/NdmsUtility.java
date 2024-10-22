@@ -49,32 +49,13 @@ public class NdmsUtility {
         return addressExtension;
     }
 
-    public void addOrganizationToMeasureReport(MeasureReport measureReport, Organization organization) {
-        // Add Reference extension pointing to Organization
-        Extension extension = getReferenceExtension(organization);
-        measureReport.addExtension(extension);
-
-        // Add Address w/ GeoLocation as Extension to MeasureReport
-        extension = getGeoLocationAddressExtension(organization);
-        measureReport.addExtension(extension);
-
-        // Add Reporter w/ just display with name
-        Reference reporterReference = new Reference();
-        reporterReference.setDisplay(organization.getName());
-        measureReport.setReporter(reporterReference);
-    }
-
-    public Extension getReferenceExtension(Organization organization) {
-        Extension extension = new Extension();
-        extension.setUrl("https://hl7.org/fhir/StructureDefinition/Reference");
-
+    public void addLocationSubjectToMeasureReport(MeasureReport measureReport, Location location) {
+        // Add Reference pointing to Location as Subject
         Reference reference = new Reference();
-        reference.setReference(String.format("%s/%s", organization.getClass().getSimpleName(), organization.getIdElement().getIdPart()));
-        reference.setDisplay(organization.getName());
+        reference.setReference(String.format("%s/%s", location.getClass().getSimpleName(), location.getIdElement().getIdPart()));
+        reference.setDisplay(location.getName());
 
-        extension.setValue(reference);
-
-        return extension;
+        measureReport.setSubject(reference);
     }
 
     private CodeableConcept getPopulationCodeByTrac2es(String evaluationServiceLocation, String conceptMapLocation, String trac2esCode, String extensionValue) {

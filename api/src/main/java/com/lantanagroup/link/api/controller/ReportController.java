@@ -30,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 import javax.annotation.PreDestroy;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
@@ -76,25 +77,24 @@ public class ReportController extends BaseController {
     binder.setDisallowedFields(DISALLOWED_FIELDS);
   }
 
-  private void resolveOrganization(ReportCriteria criteria, ReportContext context) {
+  private void resolveLocation(ReportCriteria criteria, ReportContext context) {
     FhirDataProvider dataStore = new FhirDataProvider(config.getDataStore());
-    Organization organization = dataStore.getOrganizationById(criteria.getOrganizationId());
+    Location location = dataStore.getLocationById(criteria.getLocationId());
 
-    // Verify that this Organization has an extension in the Address with GeoLocation
-    boolean foundAddressWithGeolocation = false;
-    for (Address address : organization.getAddress()) {
-      for (Extension extension : address.getExtension()) {
-        if (extension.getUrl().equals(Constants.FHIR_GEOLOCATION_URL)) {
-          foundAddressWithGeolocation = true;
-        }
-      }
+    // Verify that the location has position information
+    if (location.getPosition() == null) {
+      throw new FHIRException(String.format("Location %s, specified for report generation does not include necessary geolocation", criteria.getLocationId()));
     }
 
-    if (!foundAddressWithGeolocation) {
-      throw new FHIRException(String.format("Organization %s, specified for report generation does not include necessary geolocation", criteria.getOrganizationId()));
+    if ( (location.getPosition().getLatitude() == null) || (location.getPosition().getLongitude() == null) ) {
+      throw new FHIRException(String.format("Location %s, specified for report generation does not include necessary geolocation", criteria.getLocationId()));
     }
 
-    context.setReportOrganization(organization);
+    context.setReportLocation(location);
+  }
+
+  private void newResolveMeasures() {
+
   }
 
   // TODO - remove me here once scoop finished in ReportDataController
@@ -160,9 +160,49 @@ public class ReportController extends BaseController {
   }
 
   @PostMapping("/generate-report")
-  public ResponseEntity<Job> generateReport() {
+  public ResponseEntity<Object> newGenerateReport(@AuthenticationPrincipal LinkCredentials user,
+                                            HttpServletRequest request,
+                                            @Valid @RequestBody GenerateReport generateReport) {
 
-    return ResponseEntity.ok(new Job());
+    // We want to go ahead here and see if a report with the identifier this criteria would generate already
+    // exists.  If so but the regenerate flag isn't set then we want to fail with a 409, which is the legacy
+    // behavior expected by the Web component.
+    String masterIdentifierValue = generateReport.getMasterIdentifierValue();
+    // search by masterIdentifierValue to uniquely identify the document - searching by combination of identifiers could return multiple documents
+    // like in the case one document contains the subset of identifiers of what other document contains
+    DocumentReference existingDocumentReference = this.getFhirDataProvider().findDocRefForReport(masterIdentifierValue);
+    // Search the reference document by measure criteria and reporting period
+    if (existingDocumentReference != null && !generateReport.isRegenerate()) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "A report has already been generated for the specified measure and reporting period. To regenerate the report, submit your request with regenerate=true.");
+    }
+
+    ReportContext reportContext = new ReportContext(this.getFhirDataProvider());
+    reportContext.setRequest(request);
+    reportContext.setUser(user);
+
+    Task task = TaskHelper.getNewTask(user, request, Constants.GENERATE_REPORT);
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
+    fhirDataProvider.updateResource(task);
+    Job job = new Job(task);
+
+//    executor.submit(
+//            () -> generateResponse(
+//                    user,
+//                    request,
+//                    input.getOrganizationId(),
+//                    input.getBundleIds(),
+//                    input.getPeriodStart(),
+//                    input.getPeriodEnd(),
+//                    input.isRegenerate(),
+//                    job.getId()
+//            )
+//    );
+
+    return ResponseEntity.ok(job);
+  }
+
+  public void generateReport(GenerateReport generateReport) {
+    // TODO - here for when I get around to refactoring the generation of reports.
   }
 
   @PostMapping("/$generate")
@@ -177,7 +217,7 @@ public class ReportController extends BaseController {
     // We want to go ahead here and see if a report with the identifier this criteria would generate already
     // exists.  If so but the regenerate flag isn't set then we want to fail with a 409, which is the legacy
     // behavior expected by the Web component.
-    ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getOrganizationId(), input.getPeriodStart(), input.getPeriodEnd());
+    ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getLocationId(), input.getPeriodStart(), input.getPeriodEnd());
     String masterIdentifierValue = ReportIdHelper.getMasterIdentifierValue(criteria);
     // search by masterIdentifierValue to uniquely identify the document - searching by combination of identifiers could return multiple documents
     // like in the case one document contains the subset of identifiers of what other document contains
@@ -196,7 +236,7 @@ public class ReportController extends BaseController {
             () -> generateResponse(
                     user,
                     request,
-                    input.getOrganizationId(),
+                    input.getLocationId(),
                     input.getBundleIds(),
                     input.getPeriodStart(),
                     input.getPeriodEnd(),
@@ -209,51 +249,12 @@ public class ReportController extends BaseController {
   }
 
   /**
-   * to be invoked when only a multiMeasureBundleId is provided
-   *
-   * @return Returns a GenerateResponse
-   * @throws Exception
-   */
-  @PostMapping("/$generateMultiMeasure")
-  public GenerateResponse generateReport(
-          @AuthenticationPrincipal LinkCredentials user,
-          HttpServletRequest request,
-          @RequestParam("multiMeasureBundleId") String multiMeasureBundleId,
-          @RequestParam("periodStart") String periodStart,
-          @RequestParam("periodEnd") String periodEnd,
-          @RequestParam("organizationId") String organizationId,
-          boolean regenerate)
-          throws Exception {
-    String[] singleMeasureBundleIds = new String[]{};
-
-    // should we look for multiple multimeasureid in the configuration file just in case there is a configuration mistake and error out?
-    Optional<ApiMeasurePackage> apiMeasurePackage = Optional.empty();
-    for (ApiMeasurePackage multiMeasurePackage : config.getMeasurePackages()) {
-      if (multiMeasurePackage.getId().equals(multiMeasureBundleId)) {
-        apiMeasurePackage = Optional.of(multiMeasurePackage);
-        break;
-      }
-    }
-    // get the associated bundle-ids
-    if (!apiMeasurePackage.isPresent()) {
-      throw new IllegalStateException(String.format("Multimeasure %s is not set-up.", multiMeasureBundleId));
-    }
-    singleMeasureBundleIds = apiMeasurePackage.get().getBundleIds();
-
-    Task response = TaskHelper.getNewTask(user, request, Constants.GENERATE_REPORT);
-    FhirDataProvider fhirDataProvider = getFhirDataProvider();
-    fhirDataProvider.updateResource(response);
-
-    return generateResponse(user, request, organizationId, singleMeasureBundleIds, periodStart, periodEnd, regenerate, response.getId());
-  }
-
-  /**
    * generates a response with one or multiple reports
    */
   private GenerateResponse generateResponse(
           LinkCredentials user,
           HttpServletRequest request,
-          String organizationId,
+          String locationId,
           String[] bundleIds,
           String periodStart,
           String periodEnd,
@@ -271,8 +272,8 @@ public class ReportController extends BaseController {
       // Add parameters used to generate report to Task
       Annotation note = new Annotation();
       note.setTime(new Date());
-      note.setText(String.format("Report being generated with paramters: Organization - %s / periodStart - %s / periodEnd - %s / regenerate - %s / bundleIds - %s",
-              organizationId,
+      note.setText(String.format("Report being generated with paramters: Location - %s / periodStart - %s / periodEnd - %s / regenerate - %s / bundleIds - %s",
+              locationId,
               periodStart,
               periodEnd,
               regenerate,
@@ -280,7 +281,7 @@ public class ReportController extends BaseController {
       task.addNote(note);
 
 
-      ReportCriteria criteria = new ReportCriteria(List.of(bundleIds), organizationId, periodStart, periodEnd);
+      ReportCriteria criteria = new ReportCriteria(List.of(bundleIds), locationId, periodStart, periodEnd);
       ReportContext reportContext = new ReportContext(this.getFhirDataProvider());
 
       reportContext.setRequest(request);
@@ -291,8 +292,8 @@ public class ReportController extends BaseController {
       // Get the latest measure def and update it on the FHIR storage server
       this.resolveMeasures(criteria, reportContext);
 
-      // Pull specified Organization and add to context
-      resolveOrganization(criteria, reportContext);
+      // Pull specified Location and add to context
+      resolveLocation(criteria, reportContext);
 
       this.eventService.triggerEvent(EventTypes.AfterMeasureResolution, criteria, reportContext);
 

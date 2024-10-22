@@ -38,6 +38,6 @@ public class RefreshPatientListConfig {
         @NotBlank
         private String patientListIdentifier;
         @NotBlank
-        private String patientListOrganization;
+        private String patientListLocation;
     }
 }

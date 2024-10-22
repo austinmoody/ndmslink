@@ -10,6 +10,6 @@ public class GenerateRequest {
   private String[] bundleIds;
   private String periodStart;
   private String periodEnd;
-  private String organizationId;
+  private String locationId;
   // TODO: Change bundleIds to just a measureId when I get there....
 }

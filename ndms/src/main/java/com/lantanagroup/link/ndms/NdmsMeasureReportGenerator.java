@@ -153,8 +153,8 @@ public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
                         reportContext.getFhirProvider().updateResource(patientMeasureReport);
                         stopwatch.stop();
 
-                        // Add Organization Info to MeasureReport
-                        ndmsUtility.addOrganizationToMeasureReport(patientMeasureReport, reportContext.getReportOrganization());
+                        // Add Location Info to MeasureReport
+                        ndmsUtility.addLocationSubjectToMeasureReport(patientMeasureReport, reportContext.getReportLocation());
 
                         return patientMeasureReport;
                     }).collect(Collectors.toList())).get();
@@ -169,7 +169,7 @@ public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
         MeasureReport masterMeasureReport = reportAggregator.generate(criteria, reportContext, measureContext, config);
 
         // Add  Organization Information to MeasureReport
-        ndmsUtility.addOrganizationToMeasureReport(masterMeasureReport, reportContext.getReportOrganization());
+        ndmsUtility.addLocationSubjectToMeasureReport(masterMeasureReport, reportContext.getReportLocation());
 
         // Tag "Master" MeasureReport
         masterMeasureReport.getMeta().addTag(Constants.NDMS_AGGREGATE_MEASURE_REPORT);
