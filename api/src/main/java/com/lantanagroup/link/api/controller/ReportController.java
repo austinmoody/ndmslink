@@ -3,6 +3,7 @@ package com.lantanagroup.link.api.controller;
 import ca.uhn.fhir.model.api.TemporalPrecisionEnum;
 import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.*;
+import com.lantanagroup.link.api.ApiUtility;
 import com.lantanagroup.link.auth.LinkCredentials;
 import com.lantanagroup.link.config.query.QueryConfig;
 import com.lantanagroup.link.config.query.USCoreConfig;
@@ -164,7 +165,7 @@ public class ReportController extends BaseController {
     // We want to go ahead here and see if a report with the identifier this criteria would generate already
     // exists.  If so but the regenerate flag isn't set then we want to fail with a 409, which is the legacy
     // behavior expected by the Web component.
-    String masterIdentifierValue = generateReport.getMasterIdentifierValue();
+    String masterIdentifierValue = ApiUtility.createMasterIdentifierValue(generateReport);
     // search by masterIdentifierValue to uniquely identify the document - searching by combination of identifiers could return multiple documents
     // like in the case one document contains the subset of identifiers of what other document contains
     DocumentReference existingDocumentReference = this.getFhirDataProvider().findDocRefForReport(masterIdentifierValue);
@@ -203,7 +204,7 @@ public class ReportController extends BaseController {
   }
 
   @PostMapping("/$generate")
-  public ResponseEntity<?> generateReport(@AuthenticationPrincipal LinkCredentials user,
+  public ResponseEntity<Object> generateReport(@AuthenticationPrincipal LinkCredentials user,
                                           HttpServletRequest request,
                                           @RequestBody GenerateRequest input) {
 

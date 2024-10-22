@@ -21,32 +21,23 @@ public class GenerateReport {
     @NotBlank(message = "Report Period End must be specified")
     private String periodEnd;
     // Used to lookup "Generate Report Configuration" from ApiConfig
-    @NotBlank(message = "Report Organization must be specified")
-    private String organizationId;
+    @NotBlank(message = "Report Location must be specified")
+    private String locationId;
+    @NotBlank(message = "Report Measure must be specified")
+    private String measureId;
 
     public Annotation getAnnotation() {
         Annotation annotation = new Annotation();
         annotation.setTime(new Date());
         annotation.setText(
-                String.format("Generate Report parameters: Organization: %s / Period Start: %s / Period End: %s / Regenerate?: %s",
-                organizationId,
-                getPeriodStart(),
-                getPeriodEnd(),
+                String.format("Generate Report parameters: Location: %s / Measure: %s / Period Start: %s / Period End: %s / Regenerate?: %s",
+                locationId,
+                measureId,
+                periodStart,
+                periodEnd,
                 regenerate)
         );
         return annotation;
-    }
-
-    // Simulating old ReportIdHelper
-    public String getMasterIdentifierValue() {
-        Collection<String> components = new LinkedList<>();
-        components.add(organizationId);
-        components.add(periodStart);
-        components.add(periodEnd);
-
-        return Integer.toHexString(
-                String.join("-", components).hashCode()
-        );
     }
 
 }

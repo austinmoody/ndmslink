@@ -3,11 +3,16 @@ package com.lantanagroup.link.api;
 import com.lantanagroup.link.FhirDataProvider;
 import com.lantanagroup.link.FhirHelper;
 import com.lantanagroup.link.config.api.ApiDataStoreConfig;
+import com.lantanagroup.link.model.GenerateReport;
 import com.lantanagroup.link.model.ReportContext;
+import com.lantanagroup.link.model.ReportCriteria;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Location;
 import org.hl7.fhir.r4.model.Measure;
+
+import java.util.Collection;
+import java.util.LinkedList;
 
 public class ApiUtility {
 
@@ -47,4 +52,36 @@ public class ApiUtility {
 
     }
 
+    public static String createMasterIdentifierValue(String locationId,
+                                                     String measureId,
+                                                     String periodStart,
+                                                     String periodEnd) {
+        Collection<String> components = new LinkedList<>();
+        components.add(locationId);
+        components.add(measureId);
+        components.add(periodStart);
+        components.add(periodEnd);
+
+        return Integer.toHexString(
+                String.join("-", components).hashCode()
+        );
+    }
+
+    public static String createMasterIdentifierValue(GenerateReport generateReport) {
+        return createMasterIdentifierValue(
+                generateReport.getLocationId(),
+                generateReport.getMeasureId(),
+                generateReport.getPeriodStart(),
+                generateReport.getPeriodEnd()
+        );
+    }
+
+    public static String createMasterIdentifierValue(ReportCriteria reportCriteria) {
+        return createMasterIdentifierValue(
+          reportCriteria.getLocationId(),
+          reportCriteria.getMeasureId(),
+          reportCriteria.getPeriodStart(),
+          reportCriteria.getPeriodEnd()
+        );
+    }
 }

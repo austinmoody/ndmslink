@@ -21,18 +21,6 @@ public class ReportCriteria {
     this.measureId = measureId;
   }
 
-  public String getMasterIdentifierValue() {
-    Collection<String> components = new LinkedList<>();
-    components.add(locationId);
-    components.add(measureId);
-    components.add(periodStart);
-    components.add(periodEnd);
-
-    return Integer.toHexString(
-            String.join("-", components).hashCode()
-    );
-  }
-
   public Annotation getAnnotation() {
     Annotation annotation = new Annotation();
     annotation.setTime(new Date());
