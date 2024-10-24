@@ -381,13 +381,21 @@ public class ReportDataController extends BaseController {
 
     while (bundleEntrySize > 0) {
 
-      if (filterPatientTag) {
-        bundle = fhirDataProvider.getResourcesSummaryByCountTagLastUpdated(resourceType, count, Constants.MainSystem, Constants.patientDataTag, searchBeforeDate);
+      if (Boolean.TRUE.equals(filterPatientTag)) {
+        bundle = fhirDataProvider.getResourcesSummaryByCountTagLastUpdatedExclude(resourceType,
+                count,
+                Constants.MainSystem,
+                Constants.patientDataTag,
+                searchBeforeDate,
+                dataGovernanceConfig.getRetainResources());
       } else {
-        bundle = fhirDataProvider.getResourcesSummaryByCountLastUpdated(resourceType, count, searchBeforeDate);
+        bundle = fhirDataProvider.getResourcesSummaryByCountLastUpdatedExclude(resourceType,
+                count,
+                searchBeforeDate,
+                dataGovernanceConfig.getRetainResources());
       }
 
-      if( (bundle != null) && (bundle.getEntry().size() > 0) ) {
+      if( (bundle != null) && (!bundle.getEntry().isEmpty()) ) {
         bundleEntrySize = bundle.getEntry().size();
 
         for (Bundle.BundleEntryComponent entry : bundle.getEntry()) {
@@ -398,7 +406,6 @@ public class ReportDataController extends BaseController {
                   user);
 
           expunged++;
-
         }
       } else {
         bundleEntrySize = 0;

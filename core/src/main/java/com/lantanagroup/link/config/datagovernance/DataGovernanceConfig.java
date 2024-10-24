@@ -8,6 +8,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.List;
+
 @Getter
 @Setter
 @Configuration
@@ -49,4 +51,6 @@ public class DataGovernanceConfig {
    * <strong>data-governance.expunge-chunk-size</strong><br/>The number of items to expunge at a time.  This is trying to cut down on bringing back HUGE lists of data from the Data Store which has been causing issues.
    */
   private Integer expungeChunkSize;
+
+  private List<RetainResourceConfig> retainResources;
 }
