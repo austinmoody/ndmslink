@@ -8,5 +8,5 @@ import java.util.List;
 @Getter
 @Setter
 public class EpicTotalsData {
-    private List<EpicTotalsDataBundleConfig> bundles;
+    private List<EpicTotalsDataBundleConfig> locations;
 }

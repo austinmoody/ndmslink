@@ -8,6 +8,6 @@ import org.springframework.validation.annotation.Validated;
 @Setter
 @Validated
 public class EpicTotalsDataBundleConfig {
-    private String bundleId;
+    private String locationId;
     private String totalsReportId;
 }
