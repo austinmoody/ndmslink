@@ -28,7 +28,7 @@ public class FixResourceId implements IReportGenerationEvent, IReportGenerationD
     for (PatientOfInterestModel patientOfInterest : context.getPatientsOfInterest()) {
       logger.info("Patient is: " + patientOfInterest.getId());
       if (!StringUtils.isEmpty(patientOfInterest.getId())) {
-        String patientDataBundleId = ReportIdHelper.getPatientDataBundleId(context.getMasterIdentifierValue(), patientOfInterest.getId());
+        String patientDataBundleId = ReportIdHelper.getPatientDataBundleId(context.getMasterIdentifier(), patientOfInterest.getId());
         IBaseResource patientBundle = fhirDataProvider.getBundleById(patientDataBundleId);
         ResourceIdChanger.changeIds((Bundle) patientBundle);
       }

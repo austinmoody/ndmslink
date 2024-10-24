@@ -510,7 +510,7 @@ public class ReportDataController extends BaseController {
               ApiUtility.getAndVerifyMeasure(reportCriteria.getMeasureId(), config.getEvaluationService())
       );
 
-      String masterIdentifierValue = ApiUtility.createMasterIdentifierValue(reportCriteria);
+      String masterIdentifierValue = ReportIdHelper.getMasterIdentifierValue(reportCriteria);
 
       // Add note to Task
       Annotation note = new Annotation();

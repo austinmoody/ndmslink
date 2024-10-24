@@ -2,19 +2,24 @@ package com.lantanagroup.link.api;
 
 import com.lantanagroup.link.FhirDataProvider;
 import com.lantanagroup.link.FhirHelper;
+import com.lantanagroup.link.config.api.ApiConfig;
 import com.lantanagroup.link.config.api.ApiDataStoreConfig;
-import com.lantanagroup.link.model.GenerateReport;
+import com.lantanagroup.link.config.api.ApiReportDefsBundleConfig;
+import com.lantanagroup.link.config.api.GenerateReportConfig;
 import com.lantanagroup.link.model.ReportContext;
-import com.lantanagroup.link.model.ReportCriteria;
+import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Location;
 import org.hl7.fhir.r4.model.Measure;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.Collection;
-import java.util.LinkedList;
+import java.util.Optional;
 
 public class ApiUtility {
+
+    private static final Logger logger = LoggerFactory.getLogger(ApiUtility.class);
 
     private ApiUtility() {
         throw new IllegalStateException("Utility class");
@@ -52,36 +57,38 @@ public class ApiUtility {
 
     }
 
-    public static String createMasterIdentifierValue(String locationId,
-                                                     String measureId,
-                                                     String periodStart,
-                                                     String periodEnd) {
-        Collection<String> components = new LinkedList<>();
-        components.add(locationId);
-        components.add(measureId);
-        components.add(periodStart);
-        components.add(periodEnd);
+    public static String getReportAggregatorClassName(ApiConfig config, String locationId) {
+        String reportAggregatorClassName = null;
 
-        return Integer.toHexString(
-                String.join("-", components).hashCode()
-        );
+        Optional<GenerateReportConfig> generateReportConfig = config.getGenerateReportConfiguration().stream().filter(
+                grc -> grc.getLocationId().equals(locationId)
+        ).findFirst();
+
+        if (generateReportConfig.isPresent() && !StringUtils.isEmpty(generateReportConfig.get().getReportAggregator())) {
+            reportAggregatorClassName = generateReportConfig.get().getReportAggregator();
+            logger.info("Using report aggregator class {}", reportAggregatorClassName);
+        } else {
+            throw new IllegalStateException("Report Aggregator class not found for location " + locationId);
+        }
+
+        return reportAggregatorClassName;
     }
 
-    public static String createMasterIdentifierValue(GenerateReport generateReport) {
-        return createMasterIdentifierValue(
-                generateReport.getLocationId(),
-                generateReport.getMeasureId(),
-                generateReport.getPeriodStart(),
-                generateReport.getPeriodEnd()
-        );
+    public static String getReportGeneratorClassName(ApiConfig config, String locationId) {
+        String reportGeneratorClassName = null;
+
+        Optional<GenerateReportConfig> generateReportConfig = config.getGenerateReportConfiguration().stream().filter(
+                grc -> grc.getLocationId().equals(locationId)
+        ).findFirst();
+
+        if (generateReportConfig.isPresent() && !StringUtils.isEmpty(generateReportConfig.get().getReportGenerator())) {
+            reportGeneratorClassName = generateReportConfig.get().getReportGenerator();
+            logger.info("Using report generator class {}", reportGeneratorClassName);
+        } else {
+            throw new IllegalStateException("Report Generator class not found for location " + locationId);
+        }
+
+        return reportGeneratorClassName;
     }
 
-    public static String createMasterIdentifierValue(ReportCriteria reportCriteria) {
-        return createMasterIdentifierValue(
-          reportCriteria.getLocationId(),
-          reportCriteria.getMeasureId(),
-          reportCriteria.getPeriodStart(),
-          reportCriteria.getPeriodEnd()
-        );
-    }
 }

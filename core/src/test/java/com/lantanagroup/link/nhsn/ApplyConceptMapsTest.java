@@ -77,7 +77,7 @@ public class ApplyConceptMapsTest {
 
     FhirDataProvider fhirDataProviderMock = mock(FhirDataProvider.class);
     ReportContext context = new ReportContext(fhirDataProviderMock);
-    context.setMasterIdentifierValue("test");
+    context.setMasterIdentifier("test");
 
     ApplyConceptMaps applyConceptMaps = Mockito.spy(ApplyConceptMaps.class);
     applyConceptMaps.setFhirDataProvider(fhirDataProviderMock);

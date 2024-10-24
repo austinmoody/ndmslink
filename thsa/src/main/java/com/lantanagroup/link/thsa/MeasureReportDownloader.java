@@ -44,8 +44,8 @@ public class MeasureReportDownloader implements IReportDownloader {
             measureReports.add(measureReport);
         }
 
-        FhirBundler bundler = new FhirBundler(config, fhirDataProvider, eventService);
-        Bundle bundle = bundler.generateBundle(measureReports, documentReference);
+        FhirBundler bundler = new FhirBundler(config, eventService);
+        Bundle bundle = bundler.generateBundle(measureReports);
 
         logger.info("Bundle created for MeasureReport including " + bundle.getEntry().size() + " entries");
         String responseBody = "";

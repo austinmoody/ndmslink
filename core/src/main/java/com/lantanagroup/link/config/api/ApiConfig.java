@@ -131,6 +131,11 @@ public class ApiConfig {
    */
   private ApiReportDefsConfig reportDefs;
 
+  /**
+   * <strong>api.generate-report</strong><br/>Report generation configuration by Location
+   */
+  private List<GenerateReportConfig> generateReportConfiguration;
+
   private EpicTotalsData epicTotalsData;
 
   /**

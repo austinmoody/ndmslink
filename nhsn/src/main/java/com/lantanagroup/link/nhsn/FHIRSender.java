@@ -25,7 +25,7 @@ public class FHIRSender extends GenericSender implements IReportSender {
 
   @Override
   public String send(List<MeasureReport> masterMeasureReports, DocumentReference documentReference, HttpServletRequest request, FhirDataProvider fhirDataProvider, BundlerConfig bundlerConfig) throws Exception {
-    Bundle bundle = this.generateBundle(documentReference, masterMeasureReports, fhirDataProvider, bundlerConfig);
+    Bundle bundle = this.generateBundle(masterMeasureReports, fhirDataProvider, bundlerConfig);
     String location = this.sendContent(bundle, documentReference, fhirDataProvider);
 
     if (StringUtils.isNotEmpty(location)) {

@@ -78,7 +78,7 @@ public class RefreshPatientList implements RequestHandler<Void,String> {
                 RefreshPatientListConfig.PatientList list = new RefreshPatientListConfig.PatientList();
                 list.setPatientListIdentifier(patientListObject.getString("patient-list-path"));
 
-                list.setPatientListOrganization("patient-list-organization");
+                list.setPatientListLocation("patient-list-location");
                 patientLists.add(list);
             }
         }

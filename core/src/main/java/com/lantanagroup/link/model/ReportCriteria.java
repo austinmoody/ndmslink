@@ -21,6 +21,15 @@ public class ReportCriteria {
     this.measureId = measureId;
   }
 
+  public ReportCriteria(GenerateReport generateReport) {
+    this.periodStart = generateReport.getPeriodStart();
+    this.periodEnd = generateReport.getPeriodEnd();
+    this.locationId = generateReport.getLocationId();
+    this.measureId = generateReport.getMeasureId();
+    // TODO: Remove these bundleIds when refactor complete
+    this.bundleIds = new TreeSet<>();
+  }
+
   public Annotation getAnnotation() {
     Annotation annotation = new Annotation();
     annotation.setTime(new Date());

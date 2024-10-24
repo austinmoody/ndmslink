@@ -6,10 +6,7 @@ import org.hl7.fhir.r4.model.Annotation;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
-import java.util.Collection;
 import java.util.Date;
-import java.util.LinkedList;
-import java.util.List;
 
 @Getter
 @Setter
@@ -25,6 +22,9 @@ public class GenerateReport {
     private String locationId;
     @NotBlank(message = "Report Measure must be specified")
     private String measureId;
+
+    private ReportContext reportContext;
+    private String taskId;
 
     public Annotation getAnnotation() {
         Annotation annotation = new Annotation();

@@ -1,11 +1,9 @@
 package com.lantanagroup.link.model;
 
-import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.FhirDataProvider;
 import com.lantanagroup.link.auth.LinkCredentials;
 import lombok.Getter;
 import lombok.Setter;
-import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r4.model.*;
 
 import javax.servlet.http.HttpServletRequest;
@@ -18,9 +16,10 @@ public class ReportContext {
   private FhirDataProvider fhirProvider;
   private HttpServletRequest request;
   private LinkCredentials user;
-  private String masterIdentifierValue;
+  private String masterIdentifier;
   private List<ListResource> patientCensusLists = new ArrayList<>();
   private List<PatientOfInterestModel> patientsOfInterest = new ArrayList<>();
+  // TODO: Remove the measureContexts....
   private List<MeasureContext> measureContexts = new ArrayList<>();
   private MeasureContext measureContext;
   private Location reportLocation;

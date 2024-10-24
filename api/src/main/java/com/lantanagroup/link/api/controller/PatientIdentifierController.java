@@ -137,7 +137,7 @@ public class PatientIdentifierController extends BaseController {
       }
 
       ListResource list = parser.parseResource(ListResource.class, receivedBody);
-      checkListOrganization(list);
+      checkListLocation(list);
       receiveFHIR(list);
 
       logger.info("Patient List Processing Complete (Task ID: {})", taskId);
@@ -161,29 +161,35 @@ public class PatientIdentifierController extends BaseController {
     }
   }
 
-  private void checkListOrganization(ListResource listResource) {
+  private void checkListLocation(ListResource listResource) {
+
+    // The RefreshPatientList CLI adds an identifier to the FHIR List with the
+    // Constants.MainSystem system + the patient-list-location value which is
+    // configured in the cli-config.yml.  Here we attempt to pull that Location
+    // from the Data Store to make sure it's there.
+
     if (listResource.getIdentifier().isEmpty()) {
       String errorMessage = String.format("Patient List %s is missing identifier", listResource.getIdentifier());
       logger.error(errorMessage);
       throw new FHIRException(errorMessage);
     }
 
-    Identifier listOrganizationIdentifier = null;
+    Identifier listLocationIdentifier = null;
     for (Identifier identifier : listResource.getIdentifier()) {
       if (identifier.getSystem().equals(Constants.MainSystem)) {
-        listOrganizationIdentifier = identifier;
+        listLocationIdentifier = identifier;
       }
     }
-    if (listOrganizationIdentifier == null) {
+    if (listLocationIdentifier == null) {
       String errorMessage = String.format("Patient List %s is missing identifier associated with system '%s'", listResource.getId(), Constants.MainSystem);
       logger.error(errorMessage);
       throw new FHIRException(errorMessage);
     }
 
     FhirDataProvider dataStore = new FhirDataProvider(config.getDataStore());
-    Organization listOrganization = dataStore.getOrganizationById(listOrganizationIdentifier.getValue());
-    if (listOrganization == null) {
-      String errorMessage = String.format("List Organization with id '%s' was not found on Data Store '%s'", listOrganizationIdentifier.getValue(), config.getDataStore().getBaseUrl());
+    Location listLocation = dataStore.getLocationById(listLocationIdentifier.getValue());
+    if (listLocation == null) {
+      String errorMessage = String.format("List Location with id '%s' was not found on Data Store '%s'", listLocationIdentifier.getValue(), config.getDataStore().getBaseUrl());
       logger.error(errorMessage);
       throw new FHIRException(errorMessage);
     }

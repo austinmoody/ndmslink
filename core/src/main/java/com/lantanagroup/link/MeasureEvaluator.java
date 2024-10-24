@@ -37,7 +37,7 @@ public class MeasureEvaluator {
 
     private MeasureReport generateMeasureReport() {
         MeasureReport measureReport;
-        String patientDataBundleId = ReportIdHelper.getPatientDataBundleId(reportContext.getMasterIdentifierValue(), patientId);
+        String patientDataBundleId = ReportIdHelper.getPatientDataBundleId(reportContext.getMasterIdentifier(), patientId);
 
         try {
             String measureId = this.measureContext.getMeasure().getIdElement().getIdPart();

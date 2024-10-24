@@ -243,11 +243,11 @@ public class QueryTests {
 
     // Execute the query
     Query theQuery = new Query();
-    ReportCriteria criteria = new ReportCriteria(List.of(), null, null, null);
+    ReportCriteria criteria = new ReportCriteria(List.of(), null, null, null, null);
     ReportContext context = new ReportContext(new FhirDataProvider(fhirQueryClient));
     theQuery.setApplicationContext(applicationContext);
     theQuery.setFhirQueryClient(fhirQueryClient);
-    theQuery.execute(criteria, context, patientsOfInterest, "report1", queries, List.of(measureId));
+    theQuery.execute(criteria, context, patientsOfInterest, "report1", queries, measureId);
 
     // Make sure the correct queries to the FHIR server was performed
     verify(untypedQuery, times(1)).byUrl("Patient?identifier=patientIdentifier1");

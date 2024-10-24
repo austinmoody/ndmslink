@@ -206,7 +206,7 @@ public class AzureBlobStorageSender extends GenericSender implements IReportSend
 
   @Override
   public String send(List<MeasureReport> masterMeasureReports, DocumentReference documentReference, HttpServletRequest request, FhirDataProvider fhirDataProvider, BundlerConfig bundlerConfig) throws Exception {
-    Bundle bundle = this.generateBundle(documentReference, masterMeasureReports, fhirDataProvider, bundlerConfig);
+    Bundle bundle = this.generateBundle(masterMeasureReports, fhirDataProvider, bundlerConfig);
 
     this.sendContent(bundle, documentReference, fhirDataProvider);
 

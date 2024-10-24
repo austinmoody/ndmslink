@@ -69,7 +69,7 @@ public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
                         logger.info("Generating measure report for patient {}", patient);
                         MeasureReport patientMeasureReport = new MeasureReport();
                         try {
-                            String patientDataBundleId = ReportIdHelper.getPatientDataBundleId(reportContext.getMasterIdentifierValue(), patient.getId());
+                            String patientDataBundleId = ReportIdHelper.getPatientDataBundleId(reportContext.getMasterIdentifier(), patient.getId());
 
                             // get patient bundle from the fhirserver
                             FhirDataProvider fhirStoreProvider = new FhirDataProvider(config.getDataStore());

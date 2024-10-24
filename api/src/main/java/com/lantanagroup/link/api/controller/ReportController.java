@@ -65,6 +65,8 @@ public class ReportController extends BaseController {
   private StopwatchManager stopwatchManager;
 
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    @Autowired
+    private ReportDataController reportDataController;
 
   @PreDestroy
   public void shutdown() {
@@ -150,57 +152,204 @@ public class ReportController extends BaseController {
       logger.info("Querying/scooping data for the patients: " + StringUtils.join(patientsOfInterest, ", "));
       QueryConfig queryConfig = this.context.getBean(QueryConfig.class);
       IQuery query = QueryFactory.getQueryInstance(this.context, queryConfig.getQueryClass());
-      query.execute(criteria, context, patientsOfInterest, context.getMasterIdentifierValue(), resourceTypes, measureId);
+      query.execute(criteria, context, patientsOfInterest, context.getMasterIdentifier(), resourceTypes, measureId);
     } catch (Exception ex) {
       logger.error(String.format("Error scooping/storing data for the patients (%s)", StringUtils.join(patientsOfInterest, ", ")));
       throw ex;
     }
   }
 
-  @PostMapping("/generate-report")
+  @PostMapping("/generate")
   public ResponseEntity<Object> newGenerateReport(@AuthenticationPrincipal LinkCredentials user,
                                             HttpServletRequest request,
                                             @Valid @RequestBody GenerateReport generateReport) {
 
-    // We want to go ahead here and see if a report with the identifier this criteria would generate already
-    // exists.  If so but the regenerate flag isn't set then we want to fail with a 409, which is the legacy
-    // behavior expected by the Web component.
-    String masterIdentifierValue = ApiUtility.createMasterIdentifierValue(generateReport);
-    // search by masterIdentifierValue to uniquely identify the document - searching by combination of identifiers could return multiple documents
-    // like in the case one document contains the subset of identifiers of what other document contains
-    DocumentReference existingDocumentReference = this.getFhirDataProvider().findDocRefForReport(masterIdentifierValue);
-    // Search the reference document by measure criteria and reporting period
-    if (existingDocumentReference != null && !generateReport.isRegenerate()) {
-      throw new ResponseStatusException(HttpStatus.CONFLICT, "A report has already been generated for the specified measure and reporting period. To regenerate the report, submit your request with regenerate=true.");
-    }
+    // TODO - redo this regenerate thing.  It was all tied to DocumentReference and to be honest I don't care about
+    // that anymore.  So we want ot search for the MeasureReport aggregate that would get created first.
+    // Thi sis the error to throw:
+    // throw new ResponseStatusException(HttpStatus.CONFLICT, "A report has already been generated for the specified measure and reporting period. To regenerate the report, submit your request with regenerate=true.");
 
     ReportContext reportContext = new ReportContext(this.getFhirDataProvider());
     reportContext.setRequest(request);
     reportContext.setUser(user);
+    reportContext.setMasterIdentifier(
+            ReportIdHelper.getMasterIdentifierValue(generateReport)
+    );
+    generateReport.setReportContext(reportContext);
 
     Task task = TaskHelper.getNewTask(user, request, Constants.GENERATE_REPORT);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
     fhirDataProvider.updateResource(task);
     Job job = new Job(task);
 
-//    executor.submit(
-//            () -> generateResponse(
-//                    user,
-//                    request,
-//                    input.getOrganizationId(),
-//                    input.getBundleIds(),
-//                    input.getPeriodStart(),
-//                    input.getPeriodEnd(),
-//                    input.isRegenerate(),
-//                    job.getId()
-//            )
-//    );
+    generateReport.setTaskId(task.getId());
+
+    executor.submit(
+            () -> generateReport(generateReport)
+    );
 
     return ResponseEntity.ok(job);
   }
 
-  public void generateReport(GenerateReport generateReport) {
-    // TODO - here for when I get around to refactoring the generation of reports.
+  private void generateReport(GenerateReport generateReport) {
+
+    // Get the task so that it can be updated later
+    FhirDataProvider dataProvider = getFhirDataProvider();
+    Task task = dataProvider.getTaskById(generateReport.getTaskId());
+
+    try {
+
+      // Add parameters used to generate report to Task
+      task.addNote(generateReport.getAnnotation());
+
+      ReportCriteria criteria = new ReportCriteria(generateReport);
+
+      this.eventService.triggerEvent(EventTypes.BeforeMeasureResolution, criteria, generateReport.getReportContext());
+
+      // Get/Verify Location from Data Store
+      generateReport.getReportContext().setReportLocation(
+              ApiUtility.getAndVerifyLocation(generateReport.getLocationId(), config.getDataStore())
+      );
+
+      // Get Measure definition, add to context
+      // TODO: Add this to generate-report-configuration: and key off location specified when calling /generate
+      generateReport.getReportContext().setMeasureContext(
+              ApiUtility.getAndVerifyMeasure(generateReport.getMeasureId(), config.getEvaluationService())
+      );
+
+      this.eventService.triggerEvent(EventTypes.AfterMeasureResolution, criteria, generateReport.getReportContext());
+
+      // Add note to Task
+      task.addNote(
+              new Annotation()
+                      .setText(String.format("Generating report with identifier: %s", generateReport.getReportContext().getMasterIdentifier()))
+                      .setTime(new Date())
+      );
+
+      this.eventService.triggerEvent(EventTypes.BeforePatientOfInterestLookup, criteria, generateReport.getReportContext());
+
+      // Get the patient identifiers for the given date
+      getPatientIdentifiers(criteria, generateReport.getReportContext());
+
+      // Add Lists(s) being process for report to Task
+      List<String> listsIds = new ArrayList<>();
+      for (ListResource lr : generateReport.getReportContext().getPatientCensusLists()) {
+        listsIds.add(lr.getIdElement().getIdPart());
+      }
+      task.addNote(
+              new Annotation()
+                      .setTime(new Date())
+                      .setText(String.format("Patient Census Lists processed: %s", String.join(",", listsIds)))
+      );
+
+      this.eventService.triggerEvent(EventTypes.AfterPatientOfInterestLookup, criteria, generateReport.getReportContext());
+
+      this.eventService.triggerEvent(EventTypes.BeforePatientDataQuery, criteria, generateReport.getReportContext());
+
+      // Get the resource types to query
+      Set<String> resourceTypesToQuery = new HashSet<>(
+              FhirHelper.getDataRequirementTypes(
+                      generateReport.getReportContext().getMeasureContext().getReportDefBundle()
+              )
+      );
+      resourceTypesToQuery.retainAll(usCoreConfig.getPatientResourceTypes());
+
+      // Add list of Resource types that we are going to query to the Task
+      task.addNote(
+              new Annotation()
+                      .setTime(new Date())
+                      .setText(String.format("Report being generated by querying these Resource types: %s", String.join(",", resourceTypesToQuery)))
+      );
+
+      // Scoop the data for the patients and store it
+      // TODO: Make way to skip query a flag when calling generate, not an API configuration
+      if (config.isSkipQuery()) {
+        logger.info("Skipping query and store");
+        for (PatientOfInterestModel patient : generateReport.getReportContext().getPatientsOfInterest()) {
+          if (patient.getReference() != null) {
+            patient.setId(patient.getReference().replaceAll("^Patient/", ""));
+          }
+        }
+      } else {
+        // TODO: Create way to use same scoop function in ReportDataController
+        this.queryAndStorePatientData(new ArrayList<>(resourceTypesToQuery), criteria, generateReport.getReportContext());
+      }
+
+      if (generateReport.getReportContext().getPatientCensusLists().size() < 1 || generateReport.getReportContext().getPatientCensusLists() == null) {
+        String msg = "A census for the specified criteria was not found.";
+        logger.error(msg);
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, msg);
+      }
+
+      this.eventService.triggerEvent(EventTypes.AfterPatientDataQuery, criteria, generateReport.getReportContext());
+
+      this.getFhirDataProvider().audit(task,
+              generateReport.getReportContext().getUser().getJwt(),
+              FhirHelper.AuditEventTypes.InitiateQuery,
+              "Successfully Initiated Query");
+
+      // TODO: Is this the same thing added tot he report context (a level up) already?
+      generateReport.getReportContext().getMeasureContext().setReportId(
+              ReportIdHelper.getMasterMeasureReportId(generateReport.getReportContext().getMasterIdentifier(), generateReport.getReportContext().getMeasureContext().getBundleId())
+      );
+
+      String reportAggregatorClassName = ApiUtility.getReportAggregatorClassName(config, generateReport.getLocationId());
+      IReportAggregator reportAggregator = (IReportAggregator) context.getBean(Class.forName(reportAggregatorClassName));
+
+      String measureGeneratorClassName = ApiUtility.getReportGeneratorClassName(config, generateReport.getLocationId());
+      IMeasureReportGenerator measureGenerator = (IMeasureReportGenerator) context.getBean(Class.forName(measureGeneratorClassName));
+
+      this.eventService.triggerEvent(EventTypes.BeforeMeasureEval,
+              criteria,
+              generateReport.getReportContext(),
+              generateReport.getReportContext().getMeasureContext());
+
+      measureGenerator.generate(this.stopwatchManager,
+              generateReport.getReportContext(),
+              generateReport.getReportContext().getMeasureContext(),
+              criteria,
+              config,
+              generateReport.getReportContext().getUser(),
+              reportAggregator);
+
+      this.eventService.triggerEvent(EventTypes.AfterMeasureEval,
+              criteria,
+              generateReport.getReportContext(),
+              generateReport.getReportContext().getMeasureContext());
+
+      this.eventService.triggerEvent(EventTypes.BeforeReportStore,
+              criteria,
+              generateReport.getReportContext(),
+              generateReport.getReportContext().getMeasureContext());
+
+      measureGenerator.store(generateReport.getReportContext().getMeasureContext(), generateReport.getReportContext());
+
+      this.eventService.triggerEvent(EventTypes.AfterReportStore,
+              criteria,
+              generateReport.getReportContext(),
+              generateReport.getReportContext().getMeasureContext());
+
+      this.stopwatchManager.print();
+      this.stopwatchManager.reset();
+
+      task.setStatus(Task.TaskStatus.COMPLETED);
+      task.addNote(
+              new Annotation()
+                      .setTime(new Date())
+                      .setText("Done generating report.")
+      );
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with report generation: (%s) %s", ex.getClass().getSimpleName(),ex.getMessage());
+      logger.error(errorMessage);
+      Annotation note = new Annotation();
+      note.setText(errorMessage);
+      note.setTime(new Date());
+      task.addNote(note);
+      task.setStatus(Task.TaskStatus.FAILED);
+    } finally {
+      task.setLastModified(new Date());
+      dataProvider.updateResource(task);
+    }
   }
 
   @PostMapping("/$generate")
@@ -335,9 +484,9 @@ public class ReportController extends BaseController {
       // Generate the master report id
       if (!regenerate || existingDocumentReference == null) {
         // generate master report id based on the report date range and the bundles used in the report generation
-        reportContext.setMasterIdentifierValue(masterIdentifierValue);
+        reportContext.setMasterIdentifier(masterIdentifierValue);
       } else {
-        reportContext.setMasterIdentifierValue(existingDocumentReference.getMasterIdentifier().getValue());
+        reportContext.setMasterIdentifier(existingDocumentReference.getMasterIdentifier().getValue());
         this.eventService.triggerEvent(EventTypes.OnRegeneration, criteria, reportContext);
       }
 
@@ -396,13 +545,13 @@ public class ReportController extends BaseController {
 
       this.eventService.triggerEvent(EventTypes.AfterPatientDataQuery, criteria, reportContext);
 
-      response.setMasterId(reportContext.getMasterIdentifierValue());
+      response.setMasterId(reportContext.getMasterIdentifier());
 
       this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Successfully Initiated Query");
 
       for (ReportContext.MeasureContext measureContext : reportContext.getMeasureContexts()) {
 
-        measureContext.setReportId(ReportIdHelper.getMasterMeasureReportId(reportContext.getMasterIdentifierValue(), measureContext.getBundleId()));
+        measureContext.setReportId(ReportIdHelper.getMasterMeasureReportId(reportContext.getMasterIdentifier(), measureContext.getBundleId()));
 
         response.setMeasureHashId(ReportIdHelper.hash(measureContext.getBundleId()));
 
@@ -439,7 +588,7 @@ public class ReportController extends BaseController {
         documentReference.setContent(existingDocumentReference.getContent());
       } else {
         // generate document reference id based on the report date range and the measure used in the report generation
-        UUID documentId = UUID.nameUUIDFromBytes(reportContext.getMasterIdentifierValue().getBytes(StandardCharsets.UTF_8));
+        UUID documentId = UUID.nameUUIDFromBytes(reportContext.getMasterIdentifier().getBytes(StandardCharsets.UTF_8));
         documentReference.setId(documentId.toString());
       }
 
@@ -484,7 +633,7 @@ public class ReportController extends BaseController {
     DocumentReference documentReference = new DocumentReference();
     Identifier identifier = new Identifier();
     identifier.setSystem(config.getDocumentReferenceSystem());
-    identifier.setValue(reportContext.getMasterIdentifierValue());
+    identifier.setValue(reportContext.getMasterIdentifier());
 
     documentReference.setMasterIdentifier(identifier);
     for (ReportContext.MeasureContext measureContext : reportContext.getMeasureContexts()) {
