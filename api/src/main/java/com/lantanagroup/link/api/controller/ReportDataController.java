@@ -506,6 +506,8 @@ public class ReportDataController extends BaseController {
       );
 
       // Get Measure definition, add to context
+      // Measure is necessary because it can be used (depending on the Measure, THSAMeasure for example)
+      // to determine the type of FHIR resources we are going to query for.
       reportContext.setMeasureContext(
               ApiUtility.getAndVerifyMeasure(reportCriteria.getMeasureId(), config.getEvaluationService())
       );

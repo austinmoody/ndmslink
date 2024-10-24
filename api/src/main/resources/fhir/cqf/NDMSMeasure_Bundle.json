@@ -1,0 +1,116 @@
+{
+  "resourceType": "Bundle",
+  "id": "NDMSMeasure",
+  "type": "collection",
+  "entry": [
+    {
+      "fullUrl": "http://nhsnlink.org/fhir/Measure/NDMSMeasure",
+      "resource": {
+        "resourceType": "Measure",
+        "id": "NDMSMeasure",
+        "meta": {
+          "tag": [
+            {
+              "system": "https://nhsnlink.org",
+              "code": "ndms-measure",
+              "display": "NDMS Measure"
+            }
+          ]
+        },
+        "url": "http://nhsnlink.org/fhir/Measure/NDMSMeasure",
+        "identifier": [
+          {
+            "system": "https://nhsnlink.org",
+            "value": "ndmsmeasure"
+          }
+        ],
+        "version": "1.0.0",
+        "name": "NDMS Measure",
+        "title": "NDMS Bed Availability Measure",
+        "status": "draft",
+        "library": [
+          "http://nhsnlink.org/fhir/Library/NDMSMeasure-Library"
+        ],
+        "scoring": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/measure-scoring",
+              "code": "proportion",
+              "display": "Proportion"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "fullUrl": "http://nhsnlink.org/fhir/Library/NDMSMeasure-Library",
+      "resource": {
+        "resourceType": "Library",
+        "id": "NDMSMeasure-Library",
+        "url": "http://nhsnlink.org/fhir/Library/NDMSMeasure-Library",
+        "version": "1.0.0",
+        "name": "NDMSMeasureLibrary",
+        "title": "NDMS Measure Library",
+        "status": "active",
+        "type": {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/library-type",
+              "code": "module-definition"
+            }
+          ]
+        },
+        "dataRequirement": [
+          {
+            "type": "Encounter"
+          },
+          {
+            "type": "Patient"
+          },
+          {
+            "type": "Location"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/Trac2esBedTypes",
+      "resource": {
+        "resourceType": "CodeSystem",
+        "id": "Trac2esBedTypes",
+        "url": "https://thsa1.sanerproject.org:10443/fhir/CodeSystem/Trac2esBedTypes",
+        "content": "complete",
+        "concept": [
+          {
+            "code": "CC",
+            "display": "Critical Care"
+          },
+          {
+            "code": "MM-SS",
+            "display": "Medical/Surgical"
+          },
+          {
+            "code": "MP",
+            "display": "Medical/Psychiatric"
+          },
+          {
+            "code": "SBN",
+            "display": "Step-down/Basic Nursing"
+          },
+          {
+            "code": "MC",
+            "display": "Medical/COVID"
+          },
+          {
+            "code": "PICU",
+            "display": "Pediatric ICU"
+          },
+          {
+            "code": "NPU",
+            "display": "Negative Pressure Unit"
+          }
+        ]
+      }
+    }
+  ]
+}
