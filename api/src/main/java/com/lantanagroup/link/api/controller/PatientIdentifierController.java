@@ -17,6 +17,7 @@ import com.lantanagroup.link.config.query.QueryConfig;
 import com.lantanagroup.link.config.query.USCoreConfig;
 import com.lantanagroup.link.model.CsvEntry;
 import com.lantanagroup.link.model.Job;
+import com.lantanagroup.link.query.auth.EpicAuthConfig;
 import com.lantanagroup.link.query.auth.HapiFhirAuthenticationInterceptor;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
@@ -25,7 +26,6 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -58,14 +58,14 @@ public class PatientIdentifierController extends BaseController {
   private final ApiConfig apiConfig;
   private final QueryConfig queryConfig;
   private final USCoreConfig usCoreConfig;
-  private final ApplicationContext applicationContext;
+  private final EpicAuthConfig epicAuthConfig;
 
-  public PatientIdentifierController(ApiConfig apiConfig, QueryConfig queryConfig, USCoreConfig usCoreConfig, ApplicationContext applicationContext) {
+  public PatientIdentifierController(ApiConfig apiConfig, QueryConfig queryConfig, USCoreConfig usCoreConfig, EpicAuthConfig epicAuthConfig) {
     super();
     this.apiConfig = apiConfig;
     this.queryConfig = queryConfig;
     this.usCoreConfig = usCoreConfig;
-    this.applicationContext = applicationContext;
+    this.epicAuthConfig = epicAuthConfig;
   }
 
   @PreDestroy
@@ -309,11 +309,11 @@ public class PatientIdentifierController extends BaseController {
     return target;
   }
 
-  private ListResource pullListFromEpic(String locationId, String patientListId) throws ClassNotFoundException {
+  private ListResource pullListFromEpic(String locationId, String patientListId) throws Exception {
     // This will do the work of authenticating using our EPIC App client id & key, against the EPIC system's
     // oauth endpoint.  The interceptor is to be registered with the FHIR client to make calls to pull
     // resources from the EPIC system.
-    HapiFhirAuthenticationInterceptor interceptor = new HapiFhirAuthenticationInterceptor(queryConfig, applicationContext);
+    HapiFhirAuthenticationInterceptor interceptor = new HapiFhirAuthenticationInterceptor(queryConfig, epicAuthConfig);
     AdditionalRequestHeadersInterceptor headersInterceptor = new AdditionalRequestHeadersInterceptor();
     headersInterceptor.addHeaderValue("Accept","application/json");
 

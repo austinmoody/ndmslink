@@ -5,7 +5,11 @@ import ca.uhn.fhir.rest.api.MethodOutcome;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.gclient.*;
 import com.lantanagroup.link.FhirDataProvider;
+import com.lantanagroup.link.config.api.ApiConfig;
+import com.lantanagroup.link.config.query.QueryConfig;
+import com.lantanagroup.link.config.query.USCoreConfig;
 import com.lantanagroup.link.model.CsvEntry;
+import com.lantanagroup.link.query.auth.EpicAuthConfig;
 import org.hl7.fhir.instance.model.api.IBaseBundle;
 import org.hl7.fhir.r4.model.*;
 import org.junit.Assert;
@@ -19,6 +23,12 @@ import java.util.List;
 import static org.mockito.Mockito.*;
 
 public class PatientIdentifierControllerTests {
+
+  ApiConfig apiConfig = new ApiConfig();
+  QueryConfig queryConfig = new QueryConfig();
+  USCoreConfig usCoreConfig = new USCoreConfig();
+  EpicAuthConfig epicAuthConfig = new EpicAuthConfig();
+
   private void mockCreateResource(ICreate create) {
     ICreateTyped createTyped = mock(ICreateTyped.class);
     MethodOutcome createMethod = mock(MethodOutcome.class);
@@ -53,7 +63,9 @@ public class PatientIdentifierControllerTests {
     String csvContent = "urn:oid:2.16.840.1.113883.6.1000|303061395,2021-12-12,2021-12-12,121,12742537";
 
     Assert.assertThrows(ResponseStatusException.class, () -> {
-      PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+      PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+              apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+      );
       patientIdentifierController.storeCSV(csvContent, "https://nshnlink.org");
     });
   }
@@ -63,7 +75,9 @@ public class PatientIdentifierControllerTests {
     String csvContent = "urn:oid:2.16.840.1.113883.6.1000|303061395,2021-12-12,2021-12-12,121,12742537";
     HttpServletRequest httpServletRequest = mock(HttpServletRequest.class);
     Assert.assertThrows(ResponseStatusException.class, () -> {
-      PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+      PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+              apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+      );
       patientIdentifierController.storeCSV(csvContent, "");
     });
   }
@@ -75,7 +89,9 @@ public class PatientIdentifierControllerTests {
             "urn:oid:2.16.840.1.113883.6.1000,303061395,2021-12-12,2021-12-12,121,12742538";
     HttpServletRequest httpServletRequest = mock(HttpServletRequest.class);
     Assert.assertThrows(ResponseStatusException.class, () -> {
-      PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+      PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+              apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+      );
       patientIdentifierController.storeCSV(csvContent, "https://nshnlink.org|covid-min");
     });
   }
@@ -85,7 +101,9 @@ public class PatientIdentifierControllerTests {
     String csvContent = "PatientIdentifier,Start,End,EncounterID,PatientLogicalID";
     HttpServletRequest httpServletRequest = mock(HttpServletRequest.class);
     Assert.assertThrows(ResponseStatusException.class, () -> {
-      PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+      PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+              apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+      );
       patientIdentifierController.storeCSV(csvContent, "https://nshnlink.org|covid-min");
     });
   }
@@ -96,7 +114,9 @@ public class PatientIdentifierControllerTests {
             "urn:oid:2.16.840.1.113883.6.1000|303061395,2021-14-12,121,2021-14-12,121,12742537";
     HttpServletRequest httpServletRequest = mock(HttpServletRequest.class);
     Assert.assertThrows(ResponseStatusException.class, () -> {
-      PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+      PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+              apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+      );
       patientIdentifierController.storeCSV(csvContent, "https://nshnlink.org|covid-min");
     });
   }
@@ -107,7 +127,9 @@ public class PatientIdentifierControllerTests {
             "urn:oid:2.16.840.1.113883.6.1000|303061395,,,121,12742537";
     HttpServletRequest httpServletRequest = mock(HttpServletRequest.class);
     Assert.assertThrows(ResponseStatusException.class, () -> {
-      PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+      PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+              apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+      );
       patientIdentifierController.storeCSV(csvContent, "https://nshnlink.org|covid-min");
     });
   }
@@ -117,7 +139,9 @@ public class PatientIdentifierControllerTests {
     String csvContent = "PatientIdentifier,Start,End,EncounterID,PatientLogicalID\n" + ",2021-14-12,2021-14-12,,12742537";
     HttpServletRequest httpServletRequest = mock(HttpServletRequest.class);
     Assert.assertThrows(ResponseStatusException.class, () -> {
-      PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+      PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+              apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+      );
       patientIdentifierController.storeCSV(csvContent, "https://nshnlink.org|covid-min");
     });
   }
@@ -127,7 +151,9 @@ public class PatientIdentifierControllerTests {
     String csvContent = "PatientIdentifier,Start,End,EncounterID,PatientLogicalID\n" +
             "urn:oid:2.16.840.1.113883.6.1000|303061395,2021-12-12,2021-12-12,121,12742537\n" +
             "urn:oid:2.16.840.1.113883.6.1000|303061396,2021-12-12,2021-12-12,121,12742538\n";
-    PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+    PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+            apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+    );
     List<CsvEntry> listCsv = patientIdentifierController.getCsvEntries(csvContent);
     Assert.assertEquals(2, listCsv.size());
   }
@@ -146,7 +172,9 @@ public class PatientIdentifierControllerTests {
     this.mockCreateResource(create);
     when(fhirStoreClient.create()).thenReturn(create);
 
-    PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+    PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+            apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+    );
     FhirDataProvider fhirDataProvider = new FhirDataProvider(fhirStoreClient);
     patientIdentifierController.setFhirStoreProvider(fhirDataProvider);
 
@@ -172,7 +200,9 @@ public class PatientIdentifierControllerTests {
     this.mockCreateResource(create);
     when(fhirStoreClient.create()).thenReturn(create);
 
-    PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+    PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+            apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+    );
     FhirDataProvider fhirDataProvider = new FhirDataProvider(fhirStoreClient);
     patientIdentifierController.setFhirStoreProvider(fhirDataProvider);
 
@@ -185,7 +215,9 @@ public class PatientIdentifierControllerTests {
   public void testCreateNewListFromXml() throws Exception {
     String xmlContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><List xmlns=\"http://hl7.org/fhir\" xmlns:fhir=\"http://hl7.org/fhir\"><extension url=\"https://www.lantanagroup.com/fhir/StructureDefinition/link-patient-list-applicable-period\" ><valuePeriod><start value= \"2021-11-02T20:00:00.000-04:00\" /><end value= \"2021-11-02T20:00:00.000-04:00\" /></valuePeriod></extension><identifier><system value=\"https://nhsnlink.org\"/><value value=\"covid-min\"/></identifier><status value=\"current\"/><mode value=\"working\"/><entry><item><identifier><system value=\"urn:oid:2.16.840.1.113883.6.1000\"/><value value=\"101062222\"/></identifier></item></entry></List>";
 
-    PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+    PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+            apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+    );
     FhirDataProvider fhirDataProvider = mock(FhirDataProvider.class);
     patientIdentifierController.setFhirStoreProvider(fhirDataProvider);
     Bundle bundle = new Bundle();
@@ -204,7 +236,9 @@ public class PatientIdentifierControllerTests {
   public void testCreateNewListFromJson() throws Exception {
     String jsonContent = "{\"resourceType\":\"List\",\"extension\":[{\"url\":\"https://www.lantanagroup.com/fhir/StructureDefinition/link-patient-list-applicable-period\",\"valuePeriod\":{\"start\":\"2021-11-02T20:00:00.000-04:00\",\"end\":\"2021-11-02T20:00:00.000-04:00\"}}],\"identifier\":[{\"system\":\"https://nhsnlink.org\",\"value\": \"covid-min\"}],\"status\":\"current\",\"mode\":\"working\",\"entry\":[{\"item\":{\"identifier\":{\"system\":\"urn:oid:2.16.840.1.113883.6.1000\",\"value\":\"101062222\"}}}]}";
 
-    PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+    PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+            apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+    );
     FhirDataProvider fhirDataProvider = mock(FhirDataProvider.class);
     patientIdentifierController.setFhirStoreProvider(fhirDataProvider);
     Bundle bundle = new Bundle();
@@ -224,7 +258,9 @@ public class PatientIdentifierControllerTests {
   public void testUpdateExistingListXml() throws Exception {
     String xmlContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><List xmlns=\"http://hl7.org/fhir\" xmlns:fhir=\"http://hl7.org/fhir\"><extension url=\"https://www.lantanagroup.com/fhir/StructureDefinition/link-patient-list-applicable-period\" ><valuePeriod><start value= \"2021-11-02T20:00:00.000-04:00\" /><end value= \"2021-11-02T20:00:00.000-04:00\" /></valuePeriod></extension><identifier><system value=\"https://nhsnlink.org\"/><value value=\"covid-min\"/></identifier><status value=\"current\"/><mode value=\"working\"/><entry><item><identifier><system value=\"urn:oid:2.16.840.1.113883.6.1000\"/><value value=\"101062222\"/></identifier></item></entry></List>";
 
-    PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+    PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+            apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+    );
     FhirDataProvider fhirDataProvider = mock(FhirDataProvider.class);
     patientIdentifierController.setFhirStoreProvider(fhirDataProvider);
     Bundle bundle = getListBundle("https://nhsnlink.org", "covid-min", "2021-11-02T20:00:00.000-04:00");
@@ -260,7 +296,9 @@ public class PatientIdentifierControllerTests {
   @Test
   public void testMissingIdentifierInXml() throws Exception {
     String xmlContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><List xmlns=\"http://hl7.org/fhir\" xmlns:fhir=\"http://hl7.org/fhir\"><status value=\"current\"/><mode value=\"working\"/><date value=\"2021-11-03T00:00:00Z\"/><entry><item><identifier><system value=\"urn:oid:2.16.840.1.113883.6.1000\"/><value value=\"101062222\"/></identifier></item></entry></List>";
-    PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+    PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+            apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+    );
     FhirDataProvider fhirDataProvider = mock(FhirDataProvider.class);
     patientIdentifierController.setFhirStoreProvider(fhirDataProvider);
     Bundle repDefBundle = new Bundle();
@@ -275,7 +313,9 @@ public class PatientIdentifierControllerTests {
   @Test
   public void testMissingDateInXml() throws Exception {
     String xmlContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><List xmlns=\"http://hl7.org/fhir\" xmlns:fhir=\"http://hl7.org/fhir\"><identifier><system value=\"https://nhsnlink.org\"/><value value=\"covid-min\"/></identifier><status value=\"current\"/><mode value=\"working\"/><entry><item><identifier><system value=\"urn:oid:2.16.840.1.113883.6.1000\"/><value value=\"101062222\"/></identifier></item></entry></List>";
-    PatientIdentifierController patientIdentifierController = new PatientIdentifierController();
+    PatientIdentifierController patientIdentifierController = new PatientIdentifierController(
+            apiConfig, queryConfig, usCoreConfig, epicAuthConfig
+    );
     FhirDataProvider fhirDataProvider = mock(FhirDataProvider.class);
     patientIdentifierController.setFhirStoreProvider(fhirDataProvider);
     Bundle repDefBundle = new Bundle();
