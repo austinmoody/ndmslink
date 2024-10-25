@@ -9,12 +9,10 @@ import com.lantanagroup.link.config.query.USCoreConfig;
 import com.lantanagroup.link.model.*;
 import com.lantanagroup.link.query.IQuery;
 import com.lantanagroup.link.query.QueryFactory;
-import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -46,21 +44,25 @@ public class ReportController extends BaseController {
   // Disallow binding of sensitive attributes
   final String[] disallowedFields = new String[]{};
 
-  @Autowired
-  private USCoreConfig usCoreConfig;
-
-  @Setter
-  @Autowired
-  private EventService eventService;
-
-  @Autowired
-  @Setter
-  private ApplicationContext context;
-
-  @Autowired
-  private StopwatchManager stopwatchManager;
+  private final USCoreConfig usCoreConfig;
+  private final EventService eventService;
+  private final ApplicationContext context;
+  private final StopwatchManager stopwatchManager;
 
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
+
+  public ReportController(
+          ApplicationContext context,
+          EventService eventService,
+          USCoreConfig usCoreConfig,
+          StopwatchManager stopwatchManager
+  ) {
+    super();
+    this.context = context;
+    this.eventService = eventService;
+    this.usCoreConfig = usCoreConfig;
+    this.stopwatchManager = stopwatchManager;
+  }
 
   @PreDestroy
   public void shutdown() {
@@ -73,16 +75,16 @@ public class ReportController extends BaseController {
     binder.setDisallowedFields(disallowedFields);
   }
 
-  private void getPatientIdentifiers(ReportCriteria criteria, ReportContext context) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
+  private void getPatientIdentifiers(ReportCriteria criteria, ReportContext reportContext) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
     List<PatientOfInterestModel> patientOfInterestModelList;
 
     // TODO: When would the following condition ever be true?
     //       In the standard report generation pipeline, census lists haven't been retrieved by the time we get here
     //       Are we guarding against a case where a BeforePatientOfInterestLookup handler might have done so?
     //       (But wouldn't it be more appropriate to plug that logic in as the patient ID resolver?)
-    if (context.getPatientCensusLists() != null && context.getPatientCensusLists().size() > 0) {
+    if (reportContext.getPatientCensusLists() != null && reportContext.getPatientCensusLists().size() > 0) {
       patientOfInterestModelList = new ArrayList<>();
-      for (ListResource censusList : context.getPatientCensusLists()) {
+      for (ListResource censusList : reportContext.getPatientCensusLists()) {
         for (ListResource.ListEntryComponent censusPatient : censusList.getEntry()) {
           PatientOfInterestModel patient = new PatientOfInterestModel(
                   censusPatient.getItem().getReference(),
@@ -95,13 +97,13 @@ public class ReportController extends BaseController {
       Class<?> patientIdResolverClass = Class.forName(this.config.getPatientIdResolver());
       Constructor<?> patientIdentifierConstructor = patientIdResolverClass.getConstructor();
       provider = (IPatientOfInterest) patientIdentifierConstructor.newInstance();
-      provider.getPatientsOfInterest(criteria, context, this.config);
+      provider.getPatientsOfInterest(criteria, reportContext, this.config);
     }
   }
 
-  private void queryAndStorePatientData(List<String> resourceTypes, ReportCriteria criteria, ReportContext context) throws Exception {
-    List<PatientOfInterestModel> patientsOfInterest = context.getPatientsOfInterest();
-    String measureId = context.getMeasureContext().getMeasure().getIdentifierFirstRep().getValue();
+  private void queryAndStorePatientData(List<String> resourceTypes, ReportCriteria criteria, ReportContext reportContext) throws Exception {
+    List<PatientOfInterestModel> patientsOfInterest = reportContext.getPatientsOfInterest();
+    String measureId = reportContext.getMeasureContext().getMeasure().getIdentifierFirstRep().getValue();
     try {
       // Get the data
       String patientsOfInterestJoined = StringUtils.join(patientsOfInterest, ", ");
@@ -110,7 +112,7 @@ public class ReportController extends BaseController {
       );
       QueryConfig queryConfig = this.context.getBean(QueryConfig.class);
       IQuery query = QueryFactory.getQueryInstance(this.context, queryConfig.getQueryClass());
-      query.execute(criteria, context, patientsOfInterest, context.getMasterIdentifier(), resourceTypes, measureId);
+      query.execute(criteria, reportContext, patientsOfInterest, reportContext.getMasterIdentifier(), resourceTypes, measureId);
     } catch (Exception ex) {
       logger.error(String.format("Error scooping/storing data for the patients (%s)", StringUtils.join(patientsOfInterest, ", ")));
       throw ex;
@@ -169,7 +171,7 @@ public class ReportController extends BaseController {
               ApiUtility.getAndVerifyLocation(generateReport.getLocationId(), config.getDataStore())
       );
 
-      // Get Measure definition, add to context
+      // Get Measure definition, add to Report Context
       // TODO: Add this to generate-report-configuration: and key off location specified when calling /generate
       generateReport.getReportContext().setMeasureContext(
               ApiUtility.getAndVerifyMeasure(generateReport.getMeasureId(), config.getEvaluationService())
@@ -246,7 +248,7 @@ public class ReportController extends BaseController {
               FhirHelper.AuditEventTypes.InitiateQuery,
               "Successfully Initiated Query");
 
-      // TODO: Is this the same thing added tot he report context (a level up) already?
+      // TODO: Is this the same thing added to the report context (a level up) already?
       generateReport.getReportContext().getMeasureContext().setReportId(
               ReportIdHelper.getMasterMeasureReportId(generateReport.getReportContext().getMasterIdentifier(), generateReport.getReportContext().getMeasureContext().getBundleId())
       );
