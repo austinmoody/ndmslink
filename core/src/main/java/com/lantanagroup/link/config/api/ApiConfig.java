@@ -138,6 +138,8 @@ public class ApiConfig {
 
   private EpicTotalsData epicTotalsData;
 
+  private List<PatientListPullConfig> patientListPull;
+
   /**
    * <strong>api.measure-packages</strong><br>Configuration for multi measures supported by the system
    */

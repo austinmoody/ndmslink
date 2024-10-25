@@ -1,12 +1,23 @@
 package com.lantanagroup.link.api.controller;
 
+import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
+import ca.uhn.fhir.rest.client.api.IGenericClient;
+import ca.uhn.fhir.rest.client.interceptor.AdditionalRequestHeadersInterceptor;
+import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import com.google.common.annotations.VisibleForTesting;
 import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.*;
+import com.lantanagroup.link.api.ApiUtility;
+import com.lantanagroup.link.config.api.PatientListReportingPeriods;
 import com.lantanagroup.link.auth.LinkCredentials;
+import com.lantanagroup.link.config.api.ApiConfig;
+import com.lantanagroup.link.config.api.PatientListPullConfig;
+import com.lantanagroup.link.config.query.QueryConfig;
+import com.lantanagroup.link.config.query.USCoreConfig;
 import com.lantanagroup.link.model.CsvEntry;
 import com.lantanagroup.link.model.Job;
+import com.lantanagroup.link.query.auth.HapiFhirAuthenticationInterceptor;
 import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
 import com.opencsv.exceptions.CsvValidationException;
@@ -14,6 +25,7 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -24,14 +36,13 @@ import org.springframework.web.server.ResponseStatusException;
 import javax.annotation.PreDestroy;
 import javax.servlet.http.HttpServletRequest;
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -44,6 +55,18 @@ import java.util.stream.Collectors;
 public class PatientIdentifierController extends BaseController {
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private static final Logger logger = LoggerFactory.getLogger(PatientIdentifierController.class);
+  private final ApiConfig apiConfig;
+  private final QueryConfig queryConfig;
+  private final USCoreConfig usCoreConfig;
+  private final ApplicationContext applicationContext;
+
+  public PatientIdentifierController(ApiConfig apiConfig, QueryConfig queryConfig, USCoreConfig usCoreConfig, ApplicationContext applicationContext) {
+    super();
+    this.apiConfig = apiConfig;
+    this.queryConfig = queryConfig;
+    this.usCoreConfig = usCoreConfig;
+    this.applicationContext = applicationContext;
+  }
 
   @PreDestroy
   public void shutdown() {
@@ -116,6 +139,202 @@ public class PatientIdentifierController extends BaseController {
     executor.submit(() -> processPatientIdentifierListTask(body, contentType, task.getId()));
 
     return ResponseEntity.ok(job);
+  }
+
+  @PostMapping("/patient-list-pull/{locationId}")
+  public ResponseEntity<Job> patientListPull(@AuthenticationPrincipal LinkCredentials user,
+                                         HttpServletRequest request,
+                                         @PathVariable String locationId) {
+
+    Task task = TaskHelper.getNewTask(user, request, Constants.PATIENT_LIST_PULL);
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
+
+    try {
+
+      ApiUtility.addNoteToTask(task,
+              String.format("Verifying Location '%s'",locationId)
+      );
+
+      // First check to see if we can find this Location on the DataStore, we will ultimately
+      // add this as a Reference to the List resource.
+      Location location = ApiUtility.getLocationFromDataStore(apiConfig.getDataStore(), locationId);
+      // Verify that the location has Latitude/Longitude information that will ultimately be
+      // required for ArcGIS
+      if (!ApiUtility.locationHasPosition(location)) {
+        throw new FHIRException(
+                String.format("Location '%s' does not have necessary position coordinates", locationId)
+        );
+      }
+
+      ApiUtility.addNoteToTask(task,
+              String.format("Starting Patient List Pull for Location: %s", locationId)
+      );
+
+      fhirDataProvider.updateResource(task);
+
+      executor.submit(
+              () -> patientListPull(user, task.getId(), location)
+      );
+
+      // TODO: Add FHIR Audit
+
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with starting patient list pull API call: %s", ex.getMessage());
+      logger.error(errorMessage);
+      task.addNote(
+              new Annotation()
+                      .setText(errorMessage)
+                      .setTime(new Date())
+      );
+      task.setStatus(Task.TaskStatus.FAILED);
+      return ResponseEntity.badRequest().body(new Job(task));
+    } finally {
+      task.setLastModified(new Date());
+      fhirDataProvider.updateResource(task);
+    }
+
+    return ResponseEntity.ok(new Job(task));
+
+  }
+
+  private void patientListPull(LinkCredentials user, String taskId, Location location) {
+    // Get the task so that it can be updated later
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
+    Task task = fhirDataProvider.getTaskById(taskId);
+
+    try {
+
+      String locationId = location.getIdElement().getIdPart();
+
+      Optional<PatientListPullConfig> patientListPullConfig = apiConfig.getPatientListPull().stream()
+              .filter(
+                      plp -> plp.getPatientListLocation().equals(locationId)
+              ).findFirst();
+
+      if (patientListPullConfig.isEmpty()) {
+        throw new IllegalStateException(String.format("API Configuration missing patient list for Location %s", locationId));
+      }
+
+      PatientListPullConfig patientListConfig = patientListPullConfig.get();
+
+      task.addNote(
+              new Annotation()
+                      .setText(String.format("List Identifier: %s", patientListConfig.getPatientListIdentifier()))
+                      .setTime(new Date())
+      );
+
+      ListResource listFromEpic = pullListFromEpic(locationId, patientListConfig.getPatientListIdentifier());
+
+      ApiUtility.addNoteToTask(task,
+              String.format("List '%s' pulled with %d entries",
+                      listFromEpic.getTitle(),
+                      listFromEpic.getEntry().size())
+      );
+
+      ListResource listToSave = transformEpicList(listFromEpic, patientListConfig.getPatientListReportingPeriod(), location);
+
+      // Save List To Data Store
+      receiveFHIR(listToSave);
+
+      task.addNote(
+              new Annotation()
+                      .setText("Patient List Pull Complete")
+                      .setTime(new Date())
+      );
+      task.setStatus(Task.TaskStatus.COMPLETED);
+
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with patientListPull: %s", ex.getMessage());
+      logger.error(errorMessage);
+      Annotation note = new Annotation();
+      note.setText(errorMessage);
+      note.setTime(new Date());
+      task.addNote(note);
+      task.setStatus(Task.TaskStatus.FAILED);
+    } finally {
+      task.setLastModified(new Date());
+      fhirDataProvider.updateResource(task);
+    }
+
+  }
+
+  private ListResource transformEpicList(ListResource sourceList, PatientListReportingPeriods reportingPeriod, Location location) throws URISyntaxException {
+    ListResource target = new ListResource();
+
+    String locationId = location.getIdElement().getIdPart();
+
+    Period period = new Period();
+    if (reportingPeriod == null) {
+      reportingPeriod = PatientListReportingPeriods.Day;
+    }
+
+    if (reportingPeriod.equals(PatientListReportingPeriods.Month)) {
+      period
+              .setStart(Helper.getStartOfMonth(sourceList.getDate()))
+              .setEnd(Helper.getEndOfMonth(sourceList.getDate(), 0));
+    } else if (reportingPeriod.equals(PatientListReportingPeriods.Day)) {
+      period
+              .setStart(Helper.getStartOfDay(sourceList.getDate()))
+              .setEnd(Helper.getEndOfDay(sourceList.getDate(), 0));
+    }
+
+    target.addExtension(Constants.ApplicablePeriodExtensionUrl, period);
+    target.addIdentifier()
+            .setSystem(Constants.MainSystem)
+            .setValue(locationId);
+    target.setStatus(ListResource.ListStatus.CURRENT);
+    target.setMode(ListResource.ListMode.WORKING);
+    target.setTitle(String.format("Patient List for %s", locationId));
+    target.setCode(sourceList.getCode());
+    target.setDate(sourceList.getDate());
+    target.setSubjectTarget(location);
+
+    URI baseUrl = new URI(usCoreConfig.getFhirServerBase());
+    for (ListResource.ListEntryComponent sourceEntry : sourceList.getEntry()) {
+      target.addEntry(transformListEntry(sourceEntry, baseUrl));
+    }
+
+    return target;
+  }
+
+  private ListResource.ListEntryComponent transformListEntry(ListResource.ListEntryComponent source, URI baseUrl)
+          throws URISyntaxException {
+    ListResource.ListEntryComponent target = source.copy();
+    if (target.getItem().hasReference()) {
+      URI referenceUrl = new URI(target.getItem().getReference());
+      if (referenceUrl.isAbsolute()) {
+        target.getItem().setReference(baseUrl.relativize(referenceUrl).toString());
+      }
+    }
+    return target;
+  }
+
+  private ListResource pullListFromEpic(String locationId, String patientListId) throws ClassNotFoundException {
+    // This will do the work of authenticating using our EPIC App client id & key, against the EPIC system's
+    // oauth endpoint.  The interceptor is to be registered with the FHIR client to make calls to pull
+    // resources from the EPIC system.
+    HapiFhirAuthenticationInterceptor interceptor = new HapiFhirAuthenticationInterceptor(queryConfig, applicationContext);
+    AdditionalRequestHeadersInterceptor headersInterceptor = new AdditionalRequestHeadersInterceptor();
+    headersInterceptor.addHeaderValue("Accept","application/json");
+
+    FhirContext fhirContext = FhirContextProvider.getFhirContext();
+    IGenericClient fhirClient = fhirContext.newRestfulGenericClient(usCoreConfig.getFhirServerBase());
+    fhirClient.registerInterceptor(interceptor);
+    fhirClient.registerInterceptor(headersInterceptor);
+
+    // If a List doesn't exist on the server with the specified ID a
+    // 404 "ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException" will be thrown
+    ListResource r = fhirClient.fetchResourceFromUrl(ListResource.class,
+            String.format("List/%s",patientListId));
+    if (r == null) {
+      throw new ResourceNotFoundException(
+              String.format("Issue pulling List ID '%s' from Location '%s'",
+                      patientListId,
+                      locationId)
+      );
+    }
+
+    return r;
   }
 
   private void processPatientIdentifierListTask(String receivedBody, String receivedType, String taskId) {
@@ -273,6 +492,7 @@ public class PatientIdentifierController extends BaseController {
   }
 
   private void receiveFHIR(Resource resource) throws Exception {
+    // TODO: Refactor this legacy eventually.  It is set to only ever receive List
     logger.info("Storing patient identifiers");
     resource.setId((String) null);
 
@@ -320,10 +540,15 @@ public class PatientIdentifierController extends BaseController {
       //system and value represents the measure intended for this patient id list
       String system = identifierList.get(0).getSystem();
       String value = identifierList.get(0).getValue();
+
+      // TODO: Refactor - this all seems to exist to do nothing but reformat the dates in
+      // the applicable extension... just set them the right way earlier in the List
+      // pull process?
       DateTimeType startDate = applicablePeriod.getStartElement();
       DateTimeType endDate = applicablePeriod.getEndElement();
       String start = Helper.getFhirDate(LocalDateTime.of(startDate.getYear(), startDate.getMonth() + 1, startDate.getDay(), startDate.getHour(), startDate.getMinute(), startDate.getSecond()));
       String end = Helper.getFhirDate(LocalDateTime.of(endDate.getYear(), endDate.getMonth() + 1, endDate.getDay(), endDate.getHour(), endDate.getMinute(), endDate.getSecond()));
+
       Bundle bundle = this.getFhirDataProvider().findListByIdentifierAndDate(system, value, start, end);
 
       if (bundle.getEntry().isEmpty()) {

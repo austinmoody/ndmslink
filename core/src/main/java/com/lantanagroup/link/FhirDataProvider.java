@@ -123,6 +123,24 @@ public class FhirDataProvider {
     return (DocumentReference) bundle.getEntryFirstRep().getResource();
   }
 
+  public Bundle findListByIdentifierAndDate(Identifier identifier, String start, String end) {
+    return this.client
+            .search()
+            .forResource(ListResource.class)
+            .where(
+                    ListResource.IDENTIFIER.exactly().systemAndValues(
+                            identifier.getSystem(),
+                            identifier.getValue()
+                    )
+            )
+            .and(new DateClientParam("applicable-period-start").exactly().second(start))
+            .and(new DateClientParam("applicable-period-end").exactly().second(end))
+            .returnBundle(Bundle.class)
+            .cacheControl(new CacheControlDirective().setNoCache(true))
+            .execute();
+
+  }
+
   public Bundle findListByIdentifierAndDate(String system, String value, String start, String end) {
     return this.client
             .search()

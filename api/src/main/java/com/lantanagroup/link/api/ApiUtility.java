@@ -4,17 +4,15 @@ import com.lantanagroup.link.FhirDataProvider;
 import com.lantanagroup.link.FhirHelper;
 import com.lantanagroup.link.config.api.ApiConfig;
 import com.lantanagroup.link.config.api.ApiDataStoreConfig;
-import com.lantanagroup.link.config.api.ApiReportDefsBundleConfig;
 import com.lantanagroup.link.config.api.GenerateReportConfig;
 import com.lantanagroup.link.model.ReportContext;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.exceptions.FHIRException;
-import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.Location;
-import org.hl7.fhir.r4.model.Measure;
+import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Date;
 import java.util.Optional;
 
 public class ApiUtility {
@@ -57,8 +55,16 @@ public class ApiUtility {
 
     }
 
+    public static void addNoteToTask(Task task, String note) {
+        task.addNote(
+                new Annotation()
+                        .setText(note)
+                        .setTime(new Date())
+        );
+    }
+
     public static String getReportAggregatorClassName(ApiConfig config, String locationId) {
-        String reportAggregatorClassName = null;
+        String reportAggregatorClassName;
 
         Optional<GenerateReportConfig> generateReportConfig = config.getGenerateReportConfiguration().stream().filter(
                 grc -> grc.getLocationId().equals(locationId)
@@ -75,7 +81,7 @@ public class ApiUtility {
     }
 
     public static String getReportGeneratorClassName(ApiConfig config, String locationId) {
-        String reportGeneratorClassName = null;
+        String reportGeneratorClassName;
 
         Optional<GenerateReportConfig> generateReportConfig = config.getGenerateReportConfiguration().stream().filter(
                 grc -> grc.getLocationId().equals(locationId)
@@ -91,4 +97,17 @@ public class ApiUtility {
         return reportGeneratorClassName;
     }
 
+    public static Location getLocationFromDataStore(ApiDataStoreConfig dataStoreConfig, String locationId) {
+        FhirDataProvider dataStore = new FhirDataProvider(dataStoreConfig);
+        return dataStore.getLocationById(locationId);
+    }
+
+    public static boolean locationHasPosition(Location location) {
+        // Verify that the location has position information
+        if (location.getPosition() == null) {
+            return false;
+        }
+
+        return (location.getPosition().getLatitude() != null) && (location.getPosition().getLongitude() != null);
+    }
 }
