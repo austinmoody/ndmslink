@@ -2,6 +2,7 @@ package com.lantanagroup.link.api.controller;
 
 import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.*;
+import com.lantanagroup.link.api.ApiUtility;
 import com.lantanagroup.link.auth.LinkCredentials;
 import com.lantanagroup.link.config.datagovernance.DataGovernanceConfig;
 import com.lantanagroup.link.config.query.QueryConfig;
@@ -380,13 +381,21 @@ public class ReportDataController extends BaseController {
 
     while (bundleEntrySize > 0) {
 
-      if (filterPatientTag) {
-        bundle = fhirDataProvider.getResourcesSummaryByCountTagLastUpdated(resourceType, count, Constants.MainSystem, Constants.patientDataTag, searchBeforeDate);
+      if (Boolean.TRUE.equals(filterPatientTag)) {
+        bundle = fhirDataProvider.getResourcesSummaryByCountTagLastUpdatedExclude(resourceType,
+                count,
+                Constants.MainSystem,
+                Constants.patientDataTag,
+                searchBeforeDate,
+                dataGovernanceConfig.getRetainResources());
       } else {
-        bundle = fhirDataProvider.getResourcesSummaryByCountLastUpdated(resourceType, count, searchBeforeDate);
+        bundle = fhirDataProvider.getResourcesSummaryByCountLastUpdatedExclude(resourceType,
+                count,
+                searchBeforeDate,
+                dataGovernanceConfig.getRetainResources());
       }
 
-      if( (bundle != null) && (bundle.getEntry().size() > 0) ) {
+      if( (bundle != null) && (!bundle.getEntry().isEmpty()) ) {
         bundleEntrySize = bundle.getEntry().size();
 
         for (Bundle.BundleEntryComponent entry : bundle.getEntry()) {
@@ -397,7 +406,6 @@ public class ReportDataController extends BaseController {
                   user);
 
           expunged++;
-
         }
       } else {
         bundleEntrySize = 0;
@@ -457,7 +465,8 @@ public class ReportDataController extends BaseController {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, errorMessage);
       }
 
-      ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getOrganizationId(), input.getPeriodStart(), input.getPeriodEnd());
+      // TODO: Remove the blank array list when we are DONE with bundleIds
+      ReportCriteria criteria = new ReportCriteria(new ArrayList<>(), input.getLocationId(), input.getMeasureId(),input.getPeriodStart(), input.getPeriodEnd());
 
       ReportContext reportContext = new ReportContext(this.getFhirDataProvider());
       reportContext.setRequest(request);
@@ -498,8 +507,17 @@ public class ReportDataController extends BaseController {
       // Add parameters used to scoop data to Task
       task.addNote(reportCriteria.getAnnotation());
 
-      // Get Measure definition from CQF server
-      this.resolveMeasures(reportCriteria, reportContext);
+      // Get/Verify Location from Data Store
+      reportContext.setReportLocation(
+              ApiUtility.getAndVerifyLocation(reportCriteria.getLocationId(), config.getDataStore())
+      );
+
+      // Get Measure definition, add to context
+      // Measure is necessary because it can be used (depending on the Measure, THSAMeasure for example)
+      // to determine the type of FHIR resources we are going to query for.
+      reportContext.setMeasureContext(
+              ApiUtility.getAndVerifyMeasure(reportCriteria.getMeasureId(), config.getEvaluationService())
+      );
 
       String masterIdentifierValue = ReportIdHelper.getMasterIdentifierValue(reportCriteria);
 
@@ -533,10 +551,11 @@ public class ReportDataController extends BaseController {
       // But then only retain what is configured in uscore.patient-resource-types
       // RECONSIDER: This was important for THSA because we used CQL.  For NDMS we are doing more of a manual
       //             calculation so we really only care about what we have configured in uscore to scoop.
-      Set<String> resourceTypesToQuery = new HashSet<>();
-      for (ReportContext.MeasureContext measureContext : reportContext.getMeasureContexts()) {
-        resourceTypesToQuery.addAll(FhirHelper.getDataRequirementTypes(measureContext.getReportDefBundle()));
-      }
+        Set<String> resourceTypesToQuery = new HashSet<>(
+                FhirHelper.getDataRequirementTypes(
+                        reportContext.getMeasureContext().getReportDefBundle()
+                )
+        );
       resourceTypesToQuery.retainAll(usCoreConfig.getPatientResourceTypes());
 
       // Add list of Resource types that we are going to query to the Task
@@ -550,10 +569,7 @@ public class ReportDataController extends BaseController {
       // Scoop the data for the patients and store it
       QueryConfig queryConfig = this.context.getBean(QueryConfig.class);
       IQuery query = QueryFactory.getQueryInstance(this.context, queryConfig.getQueryClass());
-      List<String> measureIds = reportContext.getMeasureContexts().stream()
-              .map(measureContext -> measureContext.getMeasure().getIdentifierFirstRep().getValue())
-              .collect(Collectors.toList());
-      query.execute(reportCriteria, reportContext, reportContext.getPatientsOfInterest(), masterIdentifierValue, new ArrayList<>(resourceTypesToQuery), measureIds);
+      query.execute(reportCriteria, reportContext, reportContext.getPatientsOfInterest(), masterIdentifierValue, new ArrayList<>(resourceTypesToQuery), reportContext.getMeasureContext().getMeasure().getIdentifierFirstRep().getValue());
 
       note = new Annotation();
       note.setTime(new Date());
@@ -577,29 +593,10 @@ public class ReportDataController extends BaseController {
   }
 
   private void getPatientIdentifiers(ReportCriteria criteria, ReportContext context) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
-    IPatientIdProvider provider;
+    IPatientOfInterest provider;
     Class<?> patientIdResolverClass = Class.forName(this.config.getPatientIdResolver());
     Constructor<?> patientIdentifierConstructor = patientIdResolverClass.getConstructor();
-    provider = (IPatientIdProvider) patientIdentifierConstructor.newInstance();
+    provider = (IPatientOfInterest) patientIdentifierConstructor.newInstance();
     provider.getPatientsOfInterest(criteria, context, this.config);
   }
-
-  private void resolveMeasures(ReportCriteria criteria, ReportContext context) throws Exception {
-    context.getMeasureContexts().clear();
-    for (String bundleId : criteria.getBundleIds()) {
-
-      // Pull the report definition bundle from CQF (eval service)
-      FhirDataProvider evaluationProvider = new FhirDataProvider(config.getEvaluationService());
-      Bundle reportDefBundle = evaluationProvider.getBundleById(bundleId);
-
-      // Update the context
-      ReportContext.MeasureContext measureContext = new ReportContext.MeasureContext();
-      measureContext.setReportDefBundle(reportDefBundle);
-      measureContext.setBundleId(reportDefBundle.getIdElement().getIdPart());
-      Measure measure = FhirHelper.getMeasure(reportDefBundle);
-      measureContext.setMeasure(measure);
-      context.getMeasureContexts().add(measureContext);
-    }
-  }
-
 }

@@ -131,7 +131,14 @@ public class ApiConfig {
    */
   private ApiReportDefsConfig reportDefs;
 
+  /**
+   * <strong>api.generate-report</strong><br/>Report generation configuration by Location
+   */
+  private List<GenerateReportConfig> generateReportConfiguration;
+
   private EpicTotalsData epicTotalsData;
+
+  private List<PatientListPullConfig> patientListPull;
 
   /**
    * <strong>api.measure-packages</strong><br>Configuration for multi measures supported by the system

@@ -3,7 +3,7 @@ package com.lantanagroup.link.nhsn;
 import ca.uhn.fhir.context.FhirContext;
 import com.lantanagroup.link.FhirContextProvider;
 import com.lantanagroup.link.FhirHelper;
-import com.lantanagroup.link.IPatientIdProvider;
+import com.lantanagroup.link.IPatientOfInterest;
 import com.lantanagroup.link.IdentifierHelper;
 import com.lantanagroup.link.config.api.ApiConfig;
 import com.lantanagroup.link.model.PatientOfInterestModel;
@@ -22,7 +22,7 @@ import java.util.function.Function;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
-public class StoredListProvider implements IPatientIdProvider {
+public class StoredListProvider implements IPatientOfInterest {
   private static final Logger logger = LoggerFactory.getLogger(StoredListProvider.class);
 
   @Override

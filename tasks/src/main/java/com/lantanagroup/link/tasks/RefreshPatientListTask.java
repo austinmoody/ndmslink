@@ -55,10 +55,10 @@ public class RefreshPatientListTask {
         List<RefreshPatientListConfig.PatientList> filteredList = config.getPatientList();
 
         for (RefreshPatientListConfig.PatientList listResource : filteredList) {
-            logger.info("Reading List - {}", listResource.getPatientListIdentifier());
+            logger.info("Reading {} List ID {}", listResource.getPatientListLocation(), listResource.getPatientListIdentifier());
             ListResource source = readList(config, listResource.getPatientListIdentifier(), interceptor);
             logger.info("List has {} items", source.getEntry().size());
-            ListResource target = transformList(config, source, listResource.getPatientListOrganization());
+            ListResource target = transformList(config, source, listResource.getPatientListLocation());
             updateList(config, target);
         }
     }
@@ -88,7 +88,7 @@ public class RefreshPatientListTask {
         }
     }
 
-    private static ListResource transformList(RefreshPatientListConfig config, ListResource source, String listOrganization) throws URISyntaxException {
+    private static ListResource transformList(RefreshPatientListConfig config, ListResource source, String listLocation) throws URISyntaxException {
         logger.info("Transforming List");
         ListResource target = new ListResource();
         Period period = new Period();
@@ -110,10 +110,10 @@ public class RefreshPatientListTask {
         target.addExtension(Constants.ApplicablePeriodExtensionUrl, period);
         target.addIdentifier()
                 .setSystem(Constants.MainSystem)
-                .setValue(listOrganization);
+                .setValue(listLocation);
         target.setStatus(ListResource.ListStatus.CURRENT);
         target.setMode(ListResource.ListMode.WORKING);
-        target.setTitle(String.format("Patient List for %s", listOrganization));
+        target.setTitle(String.format("Patient List for %s", listLocation));
         target.setCode(source.getCode());
         target.setDate(source.getDate());
         URI baseUrl = new URI(config.getFhirServerBase());

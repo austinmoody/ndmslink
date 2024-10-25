@@ -1,17 +1,17 @@
 package com.lantanagroup.link;
 
 import ca.uhn.fhir.rest.client.api.IGenericClient;
+import ca.uhn.fhir.rest.gclient.*;
+import com.lantanagroup.link.config.datagovernance.RetainResourceConfig;
+import org.hl7.fhir.instance.model.api.IAnyResource;
+import org.hl7.fhir.instance.model.api.IBaseBundle;
 import org.hl7.fhir.r4.model.MeasureReport;
 import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.model.api.IQueryParameterType;
 import ca.uhn.fhir.rest.api.CacheControlDirective;
 import ca.uhn.fhir.rest.api.MethodOutcome;
 import ca.uhn.fhir.rest.api.SummaryEnum;
 import ca.uhn.fhir.rest.client.apache.GZipContentInterceptor;
 import ca.uhn.fhir.rest.client.interceptor.BasicAuthInterceptor;
-import ca.uhn.fhir.rest.gclient.DateClientParam;
-import ca.uhn.fhir.rest.gclient.ICriterion;
-import ca.uhn.fhir.rest.param.TokenParam;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.lantanagroup.link.config.api.ApiDataStoreConfig;
 import lombok.Getter;
@@ -21,20 +21,14 @@ import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.http.HttpServletRequest;
-import java.util.Collection;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
 
 public class FhirDataProvider {
   private static final Logger logger = LoggerFactory.getLogger(FhirDataProvider.class);
-  private static final String PeriodStartParamName = "periodStart";
-  private static final String PeriodEndParamName = "periodEnd";
-  private static final String ReportDocRefSystem = "urn:ietf:rfc:3986";
+  private static final String REPORT_DOC_REF_SYSTEM = "urn:ietf:rfc:3986";
   protected FhirContext ctx = FhirContextProvider.getFhirContext();
 
   @Getter
@@ -58,13 +52,13 @@ public class FhirDataProvider {
       ctx.getRestfulClientFactory().setConnectionRequestTimeout(Integer.parseInt(config.getConnectionRequestTimeout()));
     }
 
-    IGenericClient client = this.ctx.newRestfulGenericClient(config.getBaseUrl());
+    IGenericClient newClient = this.ctx.newRestfulGenericClient(config.getBaseUrl());
 
     if (StringUtils.isNotEmpty(config.getUsername()) && StringUtils.isNotEmpty(config.getPassword())) {
       BasicAuthInterceptor authInterceptor = new BasicAuthInterceptor(config.getUsername(), config.getPassword());
-      client.registerInterceptor(authInterceptor);
+      newClient.registerInterceptor(authInterceptor);
     }
-    this.client = client;
+    this.client = newClient;
   }
 
   public FhirDataProvider(String fhirBase) {
@@ -80,10 +74,10 @@ public class FhirDataProvider {
             .execute();
 
 
-    if (!outcome.getCreated() || outcome.getResource() == null) {
+    if (Boolean.TRUE.equals(!outcome.getCreated()) || outcome.getResource() == null) {
       logger.error("Failed to store/create FHIR resource");
     } else {
-      logger.debug("Stored FHIR resource with new " + outcome.getId().toString());
+      logger.debug("Stored FHIR resource with new {}", outcome.getId());
     }
 
     return (Resource) outcome.getResource();
@@ -105,49 +99,19 @@ public class FhirDataProvider {
     Resource domainResource = (Resource) outcome.getResource();
     int updatedVersion = Integer.parseInt(outcome.getId().getVersionIdPart());
     if (updatedVersion > initialVersion) {
-      logger.debug(String.format("Update is successful for %s/%s", domainResource.getResourceType().toString(), domainResource.getIdElement().getIdPart()));
+      logger.debug("Update is successful for {}/{}", domainResource.getResourceType(), domainResource.getIdElement().getIdPart());
     } else {
-      logger.info(String.format("Nothing changed in resource %s/%s", domainResource.getResourceType().toString(), domainResource.getIdElement().getIdPart()));
+      logger.info("Nothing changed in resource {}/{}", domainResource.getResourceType(), domainResource.getIdElement().getIdPart());
     }
 
     return outcome;
-  }
-
-  public DocumentReference findDocRefByMeasuresAndPeriod(Collection<Identifier> identifiers, String periodStart, String periodEnd) throws Exception {
-    DocumentReference documentReference = null;
-    DateClientParam periodStartParam = new DateClientParam(PeriodStartParamName);
-    DateClientParam periodEndParam = new DateClientParam(PeriodEndParamName);
-    List<IQueryParameterType> identifierParams = identifiers.stream()
-            .map(identifier -> new TokenParam(identifier.getSystem(), identifier.getValue()))
-            .collect(Collectors.toList());
-
-    Bundle bundle = this.client
-            .search()
-            .forResource(DocumentReference.class)
-            .where(Map.of(DocumentReference.SP_IDENTIFIER, identifierParams))
-            .and(periodStartParam.exactly().second(periodStart))
-            .and(periodEndParam.exactly().second(periodEnd))
-            .returnBundle(Bundle.class)
-            .cacheControl(new CacheControlDirective().setNoCache(true))
-            .execute();
-
-    int size = bundle.getEntry().size();
-    if (size > 0) {
-      if (size == 1) {
-        documentReference = (DocumentReference) bundle.getEntry().get(0).getResource();
-      } else {
-        throw new Exception("We have more than 1 report for the selected measures and report date.");
-      }
-    }
-
-    return documentReference;
   }
 
   public DocumentReference findDocRefForReport(String reportId) {
     Bundle bundle = this.client
             .search()
             .forResource(DocumentReference.class)
-            .where(DocumentReference.IDENTIFIER.exactly().systemAndValues(ReportDocRefSystem, reportId))
+            .where(DocumentReference.IDENTIFIER.exactly().systemAndValues(REPORT_DOC_REF_SYSTEM, reportId))
             .returnBundle(Bundle.class)
             .cacheControl(new CacheControlDirective().setNoCache(true))
             .execute();
@@ -159,18 +123,22 @@ public class FhirDataProvider {
     return (DocumentReference) bundle.getEntryFirstRep().getResource();
   }
 
-  public Bundle findBundleByIdentifier(String system, String value) {
-    Bundle bundle = (Bundle) this.client
+  public Bundle findListByIdentifierAndDate(Identifier identifier, String start, String end) {
+    return this.client
             .search()
-            .forResource(Bundle.class)
-            .where(Bundle.IDENTIFIER.exactly().systemAndValues(system, value))
+            .forResource(ListResource.class)
+            .where(
+                    ListResource.IDENTIFIER.exactly().systemAndValues(
+                            identifier.getSystem(),
+                            identifier.getValue()
+                    )
+            )
+            .and(new DateClientParam("applicable-period-start").exactly().second(start))
+            .and(new DateClientParam("applicable-period-end").exactly().second(end))
+            .returnBundle(Bundle.class)
+            .cacheControl(new CacheControlDirective().setNoCache(true))
             .execute();
 
-    if (bundle.getEntry().size() != 1) {
-      return null;
-    }
-
-    return (Bundle) bundle.getEntryFirstRep().getResource();
   }
 
   public Bundle findListByIdentifierAndDate(String system, String value, String start, String end) {
@@ -201,8 +169,8 @@ public class FhirDataProvider {
     return this.client.read().resource(Task.class).withId(taskId).execute();
   }
 
-  public Organization getOrganizationById(String organizationId) {
-    return this.client.read().resource(Organization.class).withId(organizationId).execute();
+  public Location getLocationById(String locationId) {
+    return this.client.read().resource(Location.class).withId(locationId).execute();
   }
 
   public MeasureReport getMeasureReportById(String reportId) {
@@ -224,46 +192,17 @@ public class FhirDataProvider {
   }
 
   public Bundle getMeasureReportsByIds(List<String> reportIds) {
-    // TODO: Is there a practical limit to the number of report IDs we can send here?
-    //       E.g., a maximum query string length that HAPI will accept?
-    //       If so, modify this logic to use multiple requests
-    //       Limit the number of report IDs (based on total query string length?) sent in any single request
-
     return this.client
             .search()
             .forResource(MeasureReport.class)
-            .where(Resource.RES_ID.exactly().codes(reportIds))
+            .where(IAnyResource.RES_ID.exactly().codes(reportIds))
             .returnBundle(Bundle.class)
             .cacheControl(new CacheControlDirective().setNoCache(true))
             .execute();
   }
 
-  public Measure getMeasureForReport(DocumentReference docRef) {
-    logger.debug(String.format("Getting Measure for DocumentReference %s", docRef.getId()));
-
-    if (docRef.getIdentifier().size() > 0) {
-      for (Identifier identifier : docRef.getIdentifier()) {
-        Bundle matchingMeasures = this.client
-                .search()
-                .forResource(Measure.class)
-                .where(DocumentReference.IDENTIFIER.exactly().systemAndValues(identifier.getSystem(), identifier.getValue()))
-                .returnBundle(Bundle.class)
-                .summaryMode(SummaryEnum.FALSE)
-                .execute();
-
-        if (matchingMeasures.getEntry().size() == 1) {
-          return (Measure) matchingMeasures.getEntry().get(0).getResource();
-        }
-      }
-    } else {
-      logger.warn("No identifier specified on DocumentReference");
-    }
-
-    return null;
-  }
-
   public Bundle transaction(Bundle txBundle) {
-    logger.trace("Executing transaction on " + this.client.getServerBase());
+    logger.trace("Executing transaction on {}", client.getServerBase());
 
     return this.client
             .transaction()
@@ -289,16 +228,6 @@ public class FhirDataProvider {
   public void audit(Task jobTask, DecodedJWT jwt, FhirHelper.AuditEventTypes type, String outcomeDescription) {
     AuditEvent auditEvent = FhirHelper.createAuditEvent(jobTask, jwt, type, outcomeDescription);
     this.createResource(auditEvent);
-  }
-
-  public Bundle getResources(ICriterion<?> criterion, String resourceType) {
-    return this.client
-            .search()
-            .forResource(resourceType)
-            .where(criterion)
-            .returnBundle(Bundle.class)
-            .cacheControl(new CacheControlDirective().setNoCache(true))
-            .execute();
   }
 
   /**
@@ -420,31 +349,54 @@ public class FhirDataProvider {
             .execute();
   }
 
-  public Bundle getResourcesSummaryByCountTagLastUpdated(String resourceType, Integer count, String tagSystem, String tagCode, Date lastUpdatedBefore) {
-
-    return client
-            .search()
-            .forResource(resourceType)
-            .count(count)
-            .withTag(tagSystem,tagCode)
-            .summaryMode(SummaryEnum.TRUE)
-            .where(new DateClientParam("_lastUpdated").beforeOrEquals().second(lastUpdatedBefore))
-            .returnBundle(Bundle.class)
-            .execute();
-
+  public Bundle getResourcesSummaryByCountLastUpdatedExclude(String resourceType,
+                                                             Integer count,
+                                                             Date lastUpdatedBefore,
+                                                             List<RetainResourceConfig> retainResources) {
+    IQuery<IBaseBundle> query = getBaseSummaryCountQuery(resourceType, count);
+    addLastUpdatedToQuery(query, lastUpdatedBefore);
+    addResourceExclusionsToQuery(query, resourceType, retainResources);
+    return query.returnBundle(Bundle.class).execute();
   }
 
-  public Bundle getResourcesSummaryByCountLastUpdated(String resourceType, Integer count, Date lastUpdatedBefore) {
-
+  private IQuery<IBaseBundle> getBaseSummaryCountQuery(String resourceType, Integer count) {
     return client
             .search()
             .forResource(resourceType)
             .count(count)
-            .summaryMode(SummaryEnum.TRUE)
-            .where(new DateClientParam("_lastUpdated").beforeOrEquals().second(lastUpdatedBefore))
-            .returnBundle(Bundle.class)
-            .execute();
+            .summaryMode(SummaryEnum.TRUE);
+  }
 
+  private void addLastUpdatedToQuery(IQuery<IBaseBundle> query, Date lastUpdatedBefore) {
+    ICriterion<DateClientParam> lastUpdated = new DateClientParam("_lastUpdated").beforeOrEquals().second(lastUpdatedBefore);
+    query.where(lastUpdated);
+  }
+
+  private void addResourceExclusionsToQuery(IQuery<IBaseBundle> query,
+                                            String resourceType,
+                                            List<RetainResourceConfig> retainResources) {
+    String excludeIds = retainResources.stream().filter(
+            rrc -> rrc.getResourceType().equals(resourceType)
+    ).map(RetainResourceConfig::getResourceId)
+            .collect(Collectors.joining(","));
+
+    if (!excludeIds.isEmpty()) {
+      query.where(new StringClientParam("identifier:not").matches().values(excludeIds));
+    }
+  }
+
+  public Bundle getResourcesSummaryByCountTagLastUpdatedExclude(String resourceType,
+                                                                Integer count,
+                                                                String tagSystem,
+                                                                String tagCode,
+                                                                Date lastUpdatedBefore,
+                                                                List<RetainResourceConfig> retainResources) {
+    IQuery<IBaseBundle> query = getBaseSummaryCountQuery(resourceType, count);
+    query.withTag(tagSystem, tagCode);
+    ICriterion<DateClientParam> lastUpdated = new DateClientParam("_lastUpdated").beforeOrEquals().second(lastUpdatedBefore);
+    query.where(lastUpdated);
+    addResourceExclusionsToQuery(query, resourceType, retainResources);
+    return query.returnBundle(Bundle.class).execute();
   }
 
   public Bundle getAllResourcesByType(Class<? extends IBaseResource> classType) {

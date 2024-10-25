@@ -3,8 +3,8 @@ package com.lantanagroup.link.api.controller;
 import ca.uhn.fhir.model.api.TemporalPrecisionEnum;
 import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.*;
+import com.lantanagroup.link.api.ApiUtility;
 import com.lantanagroup.link.auth.LinkCredentials;
-import com.lantanagroup.link.config.api.ApiMeasurePackage;
 import com.lantanagroup.link.config.query.QueryConfig;
 import com.lantanagroup.link.config.query.USCoreConfig;
 import com.lantanagroup.link.model.*;
@@ -30,6 +30,7 @@ import org.springframework.web.server.ResponseStatusException;
 import javax.annotation.PreDestroy;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
@@ -64,6 +65,8 @@ public class ReportController extends BaseController {
   private StopwatchManager stopwatchManager;
 
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    @Autowired
+    private ReportDataController reportDataController;
 
   @PreDestroy
   public void shutdown() {
@@ -76,25 +79,24 @@ public class ReportController extends BaseController {
     binder.setDisallowedFields(DISALLOWED_FIELDS);
   }
 
-  private void resolveOrganization(ReportCriteria criteria, ReportContext context) {
+  private void resolveLocation(ReportCriteria criteria, ReportContext context) {
     FhirDataProvider dataStore = new FhirDataProvider(config.getDataStore());
-    Organization organization = dataStore.getOrganizationById(criteria.getOrganizationId());
+    Location location = dataStore.getLocationById(criteria.getLocationId());
 
-    // Verify that this Organization has an extension in the Address with GeoLocation
-    boolean foundAddressWithGeolocation = false;
-    for (Address address : organization.getAddress()) {
-      for (Extension extension : address.getExtension()) {
-        if (extension.getUrl().equals(Constants.FHIR_GEOLOCATION_URL)) {
-          foundAddressWithGeolocation = true;
-        }
-      }
+    // Verify that the location has position information
+    if (location.getPosition() == null) {
+      throw new FHIRException(String.format("Location %s, specified for report generation does not include necessary geolocation", criteria.getLocationId()));
     }
 
-    if (!foundAddressWithGeolocation) {
-      throw new FHIRException(String.format("Organization %s, specified for report generation does not include necessary geolocation", criteria.getOrganizationId()));
+    if ( (location.getPosition().getLatitude() == null) || (location.getPosition().getLongitude() == null) ) {
+      throw new FHIRException(String.format("Location %s, specified for report generation does not include necessary geolocation", criteria.getLocationId()));
     }
 
-    context.setReportOrganization(organization);
+    context.setReportLocation(location);
+  }
+
+  private void newResolveMeasures() {
+
   }
 
   // TODO - remove me here once scoop finished in ReportDataController
@@ -134,39 +136,224 @@ public class ReportController extends BaseController {
         }
       }
     } else {
-      IPatientIdProvider provider;
+      IPatientOfInterest provider;
       Class<?> patientIdResolverClass = Class.forName(this.config.getPatientIdResolver());
       Constructor<?> patientIdentifierConstructor = patientIdResolverClass.getConstructor();
-      provider = (IPatientIdProvider) patientIdentifierConstructor.newInstance();
+      provider = (IPatientOfInterest) patientIdentifierConstructor.newInstance();
       patientOfInterestModelList = provider.getPatientsOfInterest(criteria, context, this.config);
     }
   }
 
   private void queryAndStorePatientData(List<String> resourceTypes, ReportCriteria criteria, ReportContext context) throws Exception {
     List<PatientOfInterestModel> patientsOfInterest = context.getPatientsOfInterest();
-    List<String> measureIds = context.getMeasureContexts().stream()
-            .map(measureContext -> measureContext.getMeasure().getIdentifierFirstRep().getValue())
-            .collect(Collectors.toList());
+    String measureId = context.getMeasureContext().getMeasure().getIdentifierFirstRep().getValue();
     try {
       // Get the data
       logger.info("Querying/scooping data for the patients: " + StringUtils.join(patientsOfInterest, ", "));
       QueryConfig queryConfig = this.context.getBean(QueryConfig.class);
       IQuery query = QueryFactory.getQueryInstance(this.context, queryConfig.getQueryClass());
-      query.execute(criteria, context, patientsOfInterest, context.getMasterIdentifierValue(), resourceTypes, measureIds);
+      query.execute(criteria, context, patientsOfInterest, context.getMasterIdentifier(), resourceTypes, measureId);
     } catch (Exception ex) {
       logger.error(String.format("Error scooping/storing data for the patients (%s)", StringUtils.join(patientsOfInterest, ", ")));
       throw ex;
     }
   }
 
-  @PostMapping("/generate-report")
-  public ResponseEntity<Job> generateReport() {
+  @PostMapping("/generate")
+  public ResponseEntity<Object> newGenerateReport(@AuthenticationPrincipal LinkCredentials user,
+                                            HttpServletRequest request,
+                                            @Valid @RequestBody GenerateReport generateReport) {
 
-    return ResponseEntity.ok(new Job());
+    // TODO - redo this regenerate thing.  It was all tied to DocumentReference and to be honest I don't care about
+    // that anymore.  So we want ot search for the MeasureReport aggregate that would get created first.
+    // Thi sis the error to throw:
+    // throw new ResponseStatusException(HttpStatus.CONFLICT, "A report has already been generated for the specified measure and reporting period. To regenerate the report, submit your request with regenerate=true.");
+
+    ReportContext reportContext = new ReportContext(this.getFhirDataProvider());
+    reportContext.setRequest(request);
+    reportContext.setUser(user);
+    reportContext.setMasterIdentifier(
+            ReportIdHelper.getMasterIdentifierValue(generateReport)
+    );
+    generateReport.setReportContext(reportContext);
+
+    Task task = TaskHelper.getNewTask(user, request, Constants.GENERATE_REPORT);
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
+    fhirDataProvider.updateResource(task);
+    Job job = new Job(task);
+
+    generateReport.setTaskId(task.getId());
+
+    executor.submit(
+            () -> generateReport(generateReport)
+    );
+
+    return ResponseEntity.ok(job);
+  }
+
+  private void generateReport(GenerateReport generateReport) {
+
+    // Get the task so that it can be updated later
+    FhirDataProvider dataProvider = getFhirDataProvider();
+    Task task = dataProvider.getTaskById(generateReport.getTaskId());
+
+    try {
+
+      // Add parameters used to generate report to Task
+      task.addNote(generateReport.getAnnotation());
+
+      ReportCriteria criteria = new ReportCriteria(generateReport);
+
+      this.eventService.triggerEvent(EventTypes.BeforeMeasureResolution, criteria, generateReport.getReportContext());
+
+      // Get/Verify Location from Data Store
+      generateReport.getReportContext().setReportLocation(
+              ApiUtility.getAndVerifyLocation(generateReport.getLocationId(), config.getDataStore())
+      );
+
+      // Get Measure definition, add to context
+      // TODO: Add this to generate-report-configuration: and key off location specified when calling /generate
+      generateReport.getReportContext().setMeasureContext(
+              ApiUtility.getAndVerifyMeasure(generateReport.getMeasureId(), config.getEvaluationService())
+      );
+
+      this.eventService.triggerEvent(EventTypes.AfterMeasureResolution, criteria, generateReport.getReportContext());
+
+      // Add note to Task
+      task.addNote(
+              new Annotation()
+                      .setText(String.format("Generating report with identifier: %s", generateReport.getReportContext().getMasterIdentifier()))
+                      .setTime(new Date())
+      );
+
+      this.eventService.triggerEvent(EventTypes.BeforePatientOfInterestLookup, criteria, generateReport.getReportContext());
+
+      // Get the patient identifiers for the given date
+      getPatientIdentifiers(criteria, generateReport.getReportContext());
+
+      // Add Lists(s) being process for report to Task
+      List<String> listsIds = new ArrayList<>();
+      for (ListResource lr : generateReport.getReportContext().getPatientCensusLists()) {
+        listsIds.add(lr.getIdElement().getIdPart());
+      }
+      task.addNote(
+              new Annotation()
+                      .setTime(new Date())
+                      .setText(String.format("Patient Census Lists processed: %s", String.join(",", listsIds)))
+      );
+
+      this.eventService.triggerEvent(EventTypes.AfterPatientOfInterestLookup, criteria, generateReport.getReportContext());
+
+      this.eventService.triggerEvent(EventTypes.BeforePatientDataQuery, criteria, generateReport.getReportContext());
+
+      // Get the resource types to query
+      Set<String> resourceTypesToQuery = new HashSet<>(
+              FhirHelper.getDataRequirementTypes(
+                      generateReport.getReportContext().getMeasureContext().getReportDefBundle()
+              )
+      );
+      resourceTypesToQuery.retainAll(usCoreConfig.getPatientResourceTypes());
+
+      // Add list of Resource types that we are going to query to the Task
+      task.addNote(
+              new Annotation()
+                      .setTime(new Date())
+                      .setText(String.format("Report being generated by querying these Resource types: %s", String.join(",", resourceTypesToQuery)))
+      );
+
+      // Scoop the data for the patients and store it
+      // TODO: Make way to skip query a flag when calling generate, not an API configuration
+      if (config.isSkipQuery()) {
+        logger.info("Skipping query and store");
+        for (PatientOfInterestModel patient : generateReport.getReportContext().getPatientsOfInterest()) {
+          if (patient.getReference() != null) {
+            patient.setId(patient.getReference().replaceAll("^Patient/", ""));
+          }
+        }
+      } else {
+        // TODO: Create way to use same scoop function in ReportDataController
+        this.queryAndStorePatientData(new ArrayList<>(resourceTypesToQuery), criteria, generateReport.getReportContext());
+      }
+
+      if (generateReport.getReportContext().getPatientCensusLists().size() < 1 || generateReport.getReportContext().getPatientCensusLists() == null) {
+        String msg = "A census for the specified criteria was not found.";
+        logger.error(msg);
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, msg);
+      }
+
+      this.eventService.triggerEvent(EventTypes.AfterPatientDataQuery, criteria, generateReport.getReportContext());
+
+      this.getFhirDataProvider().audit(task,
+              generateReport.getReportContext().getUser().getJwt(),
+              FhirHelper.AuditEventTypes.InitiateQuery,
+              "Successfully Initiated Query");
+
+      // TODO: Is this the same thing added tot he report context (a level up) already?
+      generateReport.getReportContext().getMeasureContext().setReportId(
+              ReportIdHelper.getMasterMeasureReportId(generateReport.getReportContext().getMasterIdentifier(), generateReport.getReportContext().getMeasureContext().getBundleId())
+      );
+
+      String reportAggregatorClassName = ApiUtility.getReportAggregatorClassName(config, generateReport.getLocationId());
+      IReportAggregator reportAggregator = (IReportAggregator) context.getBean(Class.forName(reportAggregatorClassName));
+
+      String measureGeneratorClassName = ApiUtility.getReportGeneratorClassName(config, generateReport.getLocationId());
+      IMeasureReportGenerator measureGenerator = (IMeasureReportGenerator) context.getBean(Class.forName(measureGeneratorClassName));
+
+      this.eventService.triggerEvent(EventTypes.BeforeMeasureEval,
+              criteria,
+              generateReport.getReportContext(),
+              generateReport.getReportContext().getMeasureContext());
+
+      measureGenerator.generate(this.stopwatchManager,
+              generateReport.getReportContext(),
+              generateReport.getReportContext().getMeasureContext(),
+              criteria,
+              config,
+              generateReport.getReportContext().getUser(),
+              reportAggregator);
+
+      this.eventService.triggerEvent(EventTypes.AfterMeasureEval,
+              criteria,
+              generateReport.getReportContext(),
+              generateReport.getReportContext().getMeasureContext());
+
+      this.eventService.triggerEvent(EventTypes.BeforeReportStore,
+              criteria,
+              generateReport.getReportContext(),
+              generateReport.getReportContext().getMeasureContext());
+
+      measureGenerator.store(generateReport.getReportContext().getMeasureContext(), generateReport.getReportContext());
+
+      this.eventService.triggerEvent(EventTypes.AfterReportStore,
+              criteria,
+              generateReport.getReportContext(),
+              generateReport.getReportContext().getMeasureContext());
+
+      this.stopwatchManager.print();
+      this.stopwatchManager.reset();
+
+      task.setStatus(Task.TaskStatus.COMPLETED);
+      task.addNote(
+              new Annotation()
+                      .setTime(new Date())
+                      .setText("Done generating report.")
+      );
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with report generation: (%s) %s", ex.getClass().getSimpleName(),ex.getMessage());
+      logger.error(errorMessage);
+      Annotation note = new Annotation();
+      note.setText(errorMessage);
+      note.setTime(new Date());
+      task.addNote(note);
+      task.setStatus(Task.TaskStatus.FAILED);
+    } finally {
+      task.setLastModified(new Date());
+      dataProvider.updateResource(task);
+    }
   }
 
   @PostMapping("/$generate")
-  public ResponseEntity<?> generateReport(@AuthenticationPrincipal LinkCredentials user,
+  public ResponseEntity<Object> generateReport(@AuthenticationPrincipal LinkCredentials user,
                                           HttpServletRequest request,
                                           @RequestBody GenerateRequest input) {
 
@@ -177,7 +364,7 @@ public class ReportController extends BaseController {
     // We want to go ahead here and see if a report with the identifier this criteria would generate already
     // exists.  If so but the regenerate flag isn't set then we want to fail with a 409, which is the legacy
     // behavior expected by the Web component.
-    ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getOrganizationId(), input.getPeriodStart(), input.getPeriodEnd());
+    ReportCriteria criteria = new ReportCriteria(List.of(input.getBundleIds()), input.getLocationId(), input.getMeasureId(), input.getPeriodStart(), input.getPeriodEnd());
     String masterIdentifierValue = ReportIdHelper.getMasterIdentifierValue(criteria);
     // search by masterIdentifierValue to uniquely identify the document - searching by combination of identifiers could return multiple documents
     // like in the case one document contains the subset of identifiers of what other document contains
@@ -196,11 +383,12 @@ public class ReportController extends BaseController {
             () -> generateResponse(
                     user,
                     request,
-                    input.getOrganizationId(),
+                    input.getLocationId(),
                     input.getBundleIds(),
                     input.getPeriodStart(),
                     input.getPeriodEnd(),
                     input.isRegenerate(),
+                    input.getMeasureId(),
                     job.getId()
             )
     );
@@ -209,55 +397,17 @@ public class ReportController extends BaseController {
   }
 
   /**
-   * to be invoked when only a multiMeasureBundleId is provided
-   *
-   * @return Returns a GenerateResponse
-   * @throws Exception
-   */
-  @PostMapping("/$generateMultiMeasure")
-  public GenerateResponse generateReport(
-          @AuthenticationPrincipal LinkCredentials user,
-          HttpServletRequest request,
-          @RequestParam("multiMeasureBundleId") String multiMeasureBundleId,
-          @RequestParam("periodStart") String periodStart,
-          @RequestParam("periodEnd") String periodEnd,
-          @RequestParam("organizationId") String organizationId,
-          boolean regenerate)
-          throws Exception {
-    String[] singleMeasureBundleIds = new String[]{};
-
-    // should we look for multiple multimeasureid in the configuration file just in case there is a configuration mistake and error out?
-    Optional<ApiMeasurePackage> apiMeasurePackage = Optional.empty();
-    for (ApiMeasurePackage multiMeasurePackage : config.getMeasurePackages()) {
-      if (multiMeasurePackage.getId().equals(multiMeasureBundleId)) {
-        apiMeasurePackage = Optional.of(multiMeasurePackage);
-        break;
-      }
-    }
-    // get the associated bundle-ids
-    if (!apiMeasurePackage.isPresent()) {
-      throw new IllegalStateException(String.format("Multimeasure %s is not set-up.", multiMeasureBundleId));
-    }
-    singleMeasureBundleIds = apiMeasurePackage.get().getBundleIds();
-
-    Task response = TaskHelper.getNewTask(user, request, Constants.GENERATE_REPORT);
-    FhirDataProvider fhirDataProvider = getFhirDataProvider();
-    fhirDataProvider.updateResource(response);
-
-    return generateResponse(user, request, organizationId, singleMeasureBundleIds, periodStart, periodEnd, regenerate, response.getId());
-  }
-
-  /**
    * generates a response with one or multiple reports
    */
   private GenerateResponse generateResponse(
           LinkCredentials user,
           HttpServletRequest request,
-          String organizationId,
+          String locationId,
           String[] bundleIds,
           String periodStart,
           String periodEnd,
           boolean regenerate,
+          String measureId,
           String taskId) throws Exception {
 
     GenerateResponse response = new GenerateResponse();
@@ -271,8 +421,9 @@ public class ReportController extends BaseController {
       // Add parameters used to generate report to Task
       Annotation note = new Annotation();
       note.setTime(new Date());
-      note.setText(String.format("Report being generated with paramters: Organization - %s / periodStart - %s / periodEnd - %s / regenerate - %s / bundleIds - %s",
-              organizationId,
+      note.setText(String.format("Report being generated with paramters: Location - %s / Measure - %s / periodStart - %s / periodEnd - %s / regenerate - %s / bundleIds - %s",
+              locationId,
+              measureId,
               periodStart,
               periodEnd,
               regenerate,
@@ -280,7 +431,7 @@ public class ReportController extends BaseController {
       task.addNote(note);
 
 
-      ReportCriteria criteria = new ReportCriteria(List.of(bundleIds), organizationId, periodStart, periodEnd);
+      ReportCriteria criteria = new ReportCriteria(List.of(bundleIds), locationId, measureId, periodStart, periodEnd);
       ReportContext reportContext = new ReportContext(this.getFhirDataProvider());
 
       reportContext.setRequest(request);
@@ -291,8 +442,8 @@ public class ReportController extends BaseController {
       // Get the latest measure def and update it on the FHIR storage server
       this.resolveMeasures(criteria, reportContext);
 
-      // Pull specified Organization and add to context
-      resolveOrganization(criteria, reportContext);
+      // Pull specified Location and add to context
+      resolveLocation(criteria, reportContext);
 
       this.eventService.triggerEvent(EventTypes.AfterMeasureResolution, criteria, reportContext);
 
@@ -333,9 +484,9 @@ public class ReportController extends BaseController {
       // Generate the master report id
       if (!regenerate || existingDocumentReference == null) {
         // generate master report id based on the report date range and the bundles used in the report generation
-        reportContext.setMasterIdentifierValue(masterIdentifierValue);
+        reportContext.setMasterIdentifier(masterIdentifierValue);
       } else {
-        reportContext.setMasterIdentifierValue(existingDocumentReference.getMasterIdentifier().getValue());
+        reportContext.setMasterIdentifier(existingDocumentReference.getMasterIdentifier().getValue());
         this.eventService.triggerEvent(EventTypes.OnRegeneration, criteria, reportContext);
       }
 
@@ -394,13 +545,13 @@ public class ReportController extends BaseController {
 
       this.eventService.triggerEvent(EventTypes.AfterPatientDataQuery, criteria, reportContext);
 
-      response.setMasterId(reportContext.getMasterIdentifierValue());
+      response.setMasterId(reportContext.getMasterIdentifier());
 
       this.getFhirDataProvider().audit(task, user.getJwt(), FhirHelper.AuditEventTypes.InitiateQuery, "Successfully Initiated Query");
 
       for (ReportContext.MeasureContext measureContext : reportContext.getMeasureContexts()) {
 
-        measureContext.setReportId(ReportIdHelper.getMasterMeasureReportId(reportContext.getMasterIdentifierValue(), measureContext.getBundleId()));
+        measureContext.setReportId(ReportIdHelper.getMasterMeasureReportId(reportContext.getMasterIdentifier(), measureContext.getBundleId()));
 
         response.setMeasureHashId(ReportIdHelper.hash(measureContext.getBundleId()));
 
@@ -437,7 +588,7 @@ public class ReportController extends BaseController {
         documentReference.setContent(existingDocumentReference.getContent());
       } else {
         // generate document reference id based on the report date range and the measure used in the report generation
-        UUID documentId = UUID.nameUUIDFromBytes(reportContext.getMasterIdentifierValue().getBytes(StandardCharsets.UTF_8));
+        UUID documentId = UUID.nameUUIDFromBytes(reportContext.getMasterIdentifier().getBytes(StandardCharsets.UTF_8));
         documentReference.setId(documentId.toString());
       }
 
@@ -482,7 +633,7 @@ public class ReportController extends BaseController {
     DocumentReference documentReference = new DocumentReference();
     Identifier identifier = new Identifier();
     identifier.setSystem(config.getDocumentReferenceSystem());
-    identifier.setValue(reportContext.getMasterIdentifierValue());
+    identifier.setValue(reportContext.getMasterIdentifier());
 
     documentReference.setMasterIdentifier(identifier);
     for (ReportContext.MeasureContext measureContext : reportContext.getMeasureContexts()) {

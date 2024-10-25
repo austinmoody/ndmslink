@@ -28,10 +28,12 @@ public class EncounterStatusTransformerTest {
     String start = "2022-01-01T00:00:00.000Z";
     String end = "2022-01-31T23:59:59.000Z";
     String reportID = "testID";
-    String organizationId = "testOrganization";
+    String locationId = "testLocation";
+    String measureId = "testMeasure";
+
     String patientID = "testPatient";
     FhirDataProvider fhirProvider = mock(FhirDataProvider.class);
-    ReportCriteria reportCriteria = new ReportCriteria(List.of(reportID), organizationId, start, end);
+    ReportCriteria reportCriteria = new ReportCriteria(List.of(reportID), locationId, measureId, start, end);
     ApiConfig config = new ApiConfig();
     ReportContext context = new ReportContext(fhirProvider);
     EncounterStatusTransformer encounterStatusTransformer = new EncounterStatusTransformer();
@@ -63,11 +65,11 @@ public class EncounterStatusTransformerTest {
     List<PatientOfInterestModel> patientsOfInterest = new ArrayList<>();
     patientsOfInterest.add(patientOfInterest);
     context.setPatientsOfInterest(patientsOfInterest);
-    context.setMasterIdentifierValue(reportID);
-    String bundleId = ReportIdHelper.getPatientDataBundleId(context.getMasterIdentifierValue(), patientOfInterest.getId());
+    context.setMasterIdentifier(reportID);
+    String bundleId = ReportIdHelper.getPatientDataBundleId(context.getMasterIdentifier(), patientOfInterest.getId());
     when(fhirProvider.getBundleById(bundleId)).thenReturn(bundle);
 
-    encounterStatusTransformer.execute(bundle, new ReportCriteria(new ArrayList<>(), organizationId, start, end), new ReportContext(fhirProvider), new ReportContext.MeasureContext());
+    encounterStatusTransformer.execute(bundle, new ReportCriteria(new ArrayList<>(), locationId, measureId, start, end), new ReportContext(fhirProvider), new ReportContext.MeasureContext());
 
     Encounter encounterTest1 = (Encounter)bundle.getEntry().get(1).getResource();
     Encounter encounterTest2 = (Encounter)bundle.getEntry().get(2).getResource();

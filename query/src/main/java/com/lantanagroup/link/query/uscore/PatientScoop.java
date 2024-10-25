@@ -52,22 +52,22 @@ public class PatientScoop {
 
   private HashMap<String, Resource> otherResources = new HashMap<>();
 
-  public void execute(ReportCriteria criteria, ReportContext context, List<PatientOfInterestModel> pois, String reportId, List<String> resourceTypes, List<String> measureIds) throws Exception {
+  public void execute(ReportCriteria criteria, ReportContext context, List<PatientOfInterestModel> pois, String reportId, List<String> resourceTypes, String measureId) throws Exception {
     if (this.fhirQueryServer == null) {
       throw new Exception("No FHIR server to query");
     }
 
-    this.loadPatientData(criteria, context, pois, reportId, resourceTypes, measureIds);
+    this.loadPatientData(criteria, context, pois, reportId, resourceTypes, measureId);
   }
 
-  private synchronized PatientData loadPatientData(ReportCriteria criteria, ReportContext context, Patient patient, List<String> resourceTypes, List<String> measureIds) {
+  private synchronized PatientData loadPatientData(ReportCriteria criteria, ReportContext context, Patient patient, List<String> resourceTypes, String measureId) {
     if (patient == null) return null;
 
     Stopwatch stopwatch = this.stopwatchManager.start("query-resources-patient");
 
     try {
       PatientData patientData = new PatientData(this.stopwatchManager, this.otherResources, this.eventService, this.getFhirQueryServer(), criteria, context, patient, this.usCoreConfig, resourceTypes);
-      patientData.loadData(measureIds);
+      patientData.loadData(measureId);
       return patientData;
     } catch (Exception e) {
       logger.error("Error loading data for Patient with logical ID " + patient.getIdElement().getIdPart(), e);
@@ -151,13 +151,13 @@ public class PatientScoop {
     return patients;
   }
 
-  public Bundle getPatientBundle(Patient patient, ReportCriteria criteria, ReportContext context, String reportId, List<String> resourceTypes, List<String> measureIds) {
+  public Bundle getPatientBundle(Patient patient, ReportCriteria criteria, ReportContext context, String reportId, List<String> resourceTypes, String measureId) {
 
     PatientData patientData;
     Stopwatch stopwatch = this.stopwatchManager.start("query-resources");
 
     try {
-      patientData = this.loadPatientData(criteria, context, patient, resourceTypes, measureIds);
+      patientData = this.loadPatientData(criteria, context, patient, resourceTypes, measureId);
     } catch (Exception ex) {
       logger.error("Error loading patient data for patient {}: {}", patient.getId(), ex.getMessage(), ex);
       return null;
@@ -181,13 +181,13 @@ public class PatientScoop {
     // Tag the bundle as patient-data to be able to quickly look up any data that is related to a patient
     patientBundle.getMeta().addTag(Constants.MainSystem, Constants.patientDataTag, "Patient Data");
     
-    // Tag the bundle w/ the id of the Organization.  Only purpose is to be able to pull these for debugging purposes
-    patientBundle.getMeta().addTag(Constants.MainSystem, criteria.getOrganizationId(), criteria.getOrganizationId());
+    // Tag the bundle w/ the id of the Location.  Only purpose is to be able to pull these for debugging purposes
+    patientBundle.getMeta().addTag(Constants.MainSystem, criteria.getLocationId(), criteria.getLocationId());
 
     return patientBundle;
   }
 
-  public void queryAndGetPatientData(ReportCriteria criteria, ReportContext context, String reportId, List<String> resourceTypes, List<String> measureIds, List<Patient> patients) {
+  public void queryAndGetPatientData(ReportCriteria criteria, ReportContext context, String reportId, List<String> resourceTypes, String measureId, List<Patient> patients) {
     int threshold = usCoreConfig.getParallelPatients();
     ForkJoinPool patientDataFork = new ForkJoinPool(threshold);
 
@@ -198,7 +198,7 @@ public class PatientScoop {
                 Bundle patientBundle = null;
                 try {
                   logger.debug("START : Getting Patient Bundle For Patient ID '{}'", patient.getIdElement().getIdPart());
-                  patientBundle = getPatientBundle(patient, criteria, context, reportId, resourceTypes, measureIds);
+                  patientBundle = getPatientBundle(patient, criteria, context, reportId, resourceTypes, measureId);
                   logger.debug("END : Getting Patient Bundle For Patient ID '{}'", patient.getIdElement().getIdPart());
                 } catch (Exception ex) {
                   logger.error("Issue Getting Patient Bundle For Patient ID '{}' - Message {}",
@@ -241,7 +241,7 @@ public class PatientScoop {
 
   }
 
-  public void loadPatientData(ReportCriteria criteria, ReportContext context, List<PatientOfInterestModel> patientsOfInterest, String reportId, List<String> resourceTypes, List<String> measureIds) {
+  public void loadPatientData(ReportCriteria criteria, ReportContext context, List<PatientOfInterestModel> patientsOfInterest, String reportId, List<String> resourceTypes, String measureId) {
     int threshold = usCoreConfig.getParallelPatients();
 
     List<Patient> patients = null;
@@ -256,7 +256,7 @@ public class PatientScoop {
       // loop through the patient ids to retrieve the patientData using each patient.
       logger.info(String.format("Throttling patient query load to " + threshold + " at a time"));
 
-      queryAndGetPatientData(criteria,context,reportId,resourceTypes,measureIds,patients);
+      queryAndGetPatientData(criteria, context, reportId, resourceTypes, measureId, patients);
 
     } catch (Exception e) {
       logger.error("Error scooping data for patients {}", e.getMessage(), e);

@@ -25,7 +25,7 @@ public class NdmsAggregator implements IReportAggregator {
     @Override
     public MeasureReport generate(ReportCriteria criteria, ReportContext reportContext, ReportContext.MeasureContext measureContext, ApiConfig apiConfig) throws ParseException, ExecutionException {
 
-        MeasureReport totalsMeasure = loadTotalsMeasureReport(apiConfig, measureContext.getBundleId());
+        MeasureReport totalsMeasure = loadTotalsMeasureReport(apiConfig, criteria.getLocationId());
         NdmsUtility ndmsUtility = new NdmsUtility();
 
         // Create the master measure report
@@ -151,22 +151,22 @@ public class NdmsAggregator implements IReportAggregator {
         return masterMeasureReport;
     }
 
-    private MeasureReport loadTotalsMeasureReport(ApiConfig apiConfig, String bundleId) throws ExecutionException {
+    private MeasureReport loadTotalsMeasureReport(ApiConfig apiConfig, String locationId) throws ExecutionException {
         FhirDataProvider dataStore = new FhirDataProvider(apiConfig.getDataStore());
 
         Optional<EpicTotalsDataBundleConfig> epicTotalsData =
         apiConfig.getEpicTotalsData()
-                .getBundles()
+                .getLocations()
                 .stream()
                 .filter(
-                        bundle -> bundle.getBundleId().equals(bundleId)
+                        bundle -> bundle.getLocationId().equals(locationId)
                 )
                 .findFirst();
 
         if (epicTotalsData.isPresent()) {
             return dataStore.getMeasureReportById(epicTotalsData.get().getTotalsReportId());
         } else {
-            throw new ExecutionException(String.format("EPIC Totals Report for %s not found", bundleId), new Throwable());
+            throw new ExecutionException(String.format("EPIC Totals Report for location %s not found", locationId), new Throwable());
         }
 
     }

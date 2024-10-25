@@ -1,5 +1,6 @@
 package com.lantanagroup.link;
 
+import com.lantanagroup.link.model.GenerateReport;
 import com.lantanagroup.link.model.ReportCriteria;
 
 import java.util.ArrayList;
@@ -25,9 +26,29 @@ public class ReportIdHelper {
   }
 
   public static String getMasterIdentifierValue(ReportCriteria reportCriteria) {
-    Collection<String> components = new LinkedList<>(reportCriteria.getBundleIds());
-    components.add(reportCriteria.getPeriodStart());
-    components.add(reportCriteria.getPeriodEnd());
+    return getMasterIdentifierValue(
+            reportCriteria.getLocationId(),
+            reportCriteria.getMeasureId(),
+            reportCriteria.getPeriodStart(),
+            reportCriteria.getPeriodEnd()
+    );
+  }
+
+  public static String getMasterIdentifierValue(GenerateReport generateReport) {
+    return getMasterIdentifierValue(
+            generateReport.getLocationId(),
+            generateReport.getMeasureId(),
+            generateReport.getPeriodStart(),
+            generateReport.getPeriodEnd()
+    );
+  }
+
+  public static String getMasterIdentifierValue(String locationId, String measureId, String periodStart, String periodEnd) {
+    Collection<String> components = new LinkedList<>();
+    components.add(locationId);
+    components.add(measureId);
+    components.add(periodStart);
+    components.add(periodEnd);
     return hash(components);
   }
 

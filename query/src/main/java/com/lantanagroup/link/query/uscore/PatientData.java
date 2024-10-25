@@ -93,34 +93,32 @@ public class PatientData {
     return URLEncoder.encode(ret, StandardCharsets.UTF_8);
   }
 
-  public List<String> getQuery(List<String> measureIds, String resourceType, String patientId) {
+  public List<String> getQuery(String measureId, String resourceType, String patientId) {
     String finalResourceType = resourceType;
     ArrayList<String> params = new ArrayList<>(List.of("patient=Patient/" + URLEncoder.encode(patientId, StandardCharsets.UTF_8)));
     HashMap<String, List<USCoreQueryParametersResourceConfig>> queryParameters = this.usCoreConfig.getQueryParameters();
 
     //check if queryParameters exist in config, if not just load patient without observations
-    for (String measureId : measureIds) {
-      if (queryParameters != null && !queryParameters.isEmpty()) {
-        if (this.usCoreConfig.getQueryParameters() != null && this.usCoreConfig.getQueryParameters().containsKey(measureId)) {
+    if (queryParameters != null && !queryParameters.isEmpty()) {
+      if (this.usCoreConfig.getQueryParameters() != null && this.usCoreConfig.getQueryParameters().containsKey(measureId)) {
 
-          List<USCoreQueryParametersResourceConfig> resourceQueryParams =
-                  this.usCoreConfig.getQueryParameters()
-                          .get(measureId)
-                          .stream()
-                          .filter(queryParams -> queryParams.getResourceType().equals(finalResourceType))
-                          .collect(Collectors.toList());
+        List<USCoreQueryParametersResourceConfig> resourceQueryParams =
+                this.usCoreConfig.getQueryParameters()
+                        .get(measureId)
+                        .stream()
+                        .filter(queryParams -> queryParams.getResourceType().equals(finalResourceType))
+                        .collect(Collectors.toList());
 
-          for (USCoreQueryParametersResourceConfig resourceQueryParam : resourceQueryParams) {
-            if(resourceQueryParam.getParameters() != null){
-              for (USCoreQueryParametersResourceParameterConfig param : resourceQueryParam.getParameters()) {
-                if (param.getSingleParam() != null && param.getSingleParam()) {
-                  List<String> values = param.getValues().stream().map(v -> getQueryParamValue(v, this.criteria, this.usCoreConfig.getLookbackPeriod())).collect(Collectors.toList());
-                  String paramValue = String.join(",", values);
-                  params.add(param.getName() + "=" + paramValue);
-                } else {
-                  for (String paramValue : param.getValues()) {
-                    params.add(param.getName() + "=" + getQueryParamValue(paramValue, criteria, this.usCoreConfig.getLookbackPeriod()));
-                  }
+        for (USCoreQueryParametersResourceConfig resourceQueryParam : resourceQueryParams) {
+          if(resourceQueryParam.getParameters() != null){
+            for (USCoreQueryParametersResourceParameterConfig param : resourceQueryParam.getParameters()) {
+              if (param.getSingleParam() != null && param.getSingleParam()) {
+                List<String> values = param.getValues().stream().map(v -> getQueryParamValue(v, this.criteria, this.usCoreConfig.getLookbackPeriod())).collect(Collectors.toList());
+                String paramValue = String.join(",", values);
+                params.add(param.getName() + "=" + paramValue);
+              } else {
+                for (String paramValue : param.getValues()) {
+                  params.add(param.getName() + "=" + getQueryParamValue(paramValue, criteria, this.usCoreConfig.getLookbackPeriod()));
                 }
               }
             }
@@ -214,14 +212,14 @@ public class PatientData {
    * Loads encounters for the patient first and populates encounterReferences
    * So that encounterReferences may be used to filter queries using ${encounter}
    *
-   * @param measureIds
+   * @param measureId
    */
-  private void loadEncounters(List<String> measureIds) {
-    if (this.resourceTypes.indexOf("Encounter") < 0) {
+  private void loadEncounters(String measureId) {
+    if (!this.resourceTypes.contains("Encounter")) {
       return;
     }
 
-    List<String> encounterQuery = this.getQuery(measureIds, "Encounter", this.patientId);
+    List<String> encounterQuery = this.getQuery(measureId, "Encounter", this.patientId);
     Bundle encounterBundle = this.rawSearch(encounterQuery.get(0));
     this.bundle.getEntry().addAll(encounterBundle.getEntry());
 
@@ -237,15 +235,15 @@ public class PatientData {
     }
   }
 
-  public void loadData(List<String> measureIds) {
-    if (resourceTypes.size() == 0) {
+  public void loadData(String measureId) {
+    if (resourceTypes.isEmpty()) {
       logger.error("Not querying for any patient data.");
       return;
     }
 
     // Load all encounters first to populate this.encounterReferences
     // so that the encounter ids may be used by getQuery()
-    this.loadEncounters(measureIds);
+    this.loadEncounters(measureId);
     if (this.encounterReferences.isEmpty() && usCoreConfig.isEncounterBased()) {
       logger.info("No encounters found; exiting query phase");
       return;
@@ -255,7 +253,7 @@ public class PatientData {
     Set<String> queryString = new HashSet<>();
     for (String resource : this.resourceTypes) {
       if (resource.equals("Encounter")) continue;   // Skip encounters because they were loaded earlier
-      queryString.addAll(this.getQuery(measureIds, resource, this.patientId));
+      queryString.addAll(this.getQuery(measureId, resource, this.patientId));
     }
 
     if (!queryString.isEmpty()) {
