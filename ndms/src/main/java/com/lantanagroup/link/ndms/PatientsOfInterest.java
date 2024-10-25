@@ -22,7 +22,7 @@ public class PatientsOfInterest implements IPatientOfInterest {
     private static final Logger logger = LoggerFactory.getLogger(PatientsOfInterest.class);
 
     @Override
-    public List<PatientOfInterestModel> getPatientsOfInterest(ReportCriteria criteria, ReportContext context, ApiConfig config) {
+    public void getPatientsOfInterest(ReportCriteria criteria, ReportContext context, ApiConfig config) {
 
         FhirContext ctx = FhirContextProvider.getFhirContext();
         context.getPatientCensusLists().clear();
@@ -75,6 +75,5 @@ public class PatientsOfInterest implements IPatientOfInterest {
         }
 
         logger.info("Loaded {} patients from {} census lists", context.getPatientsOfInterest().size(), context.getPatientCensusLists().size());
-        return context.getPatientsOfInterest();
     }
 }
