@@ -599,6 +599,7 @@ public class FhirHelper {
     ExcludePatients,
     Export,
     Send,
+    LOCATION_CREATE_UPDATE,
     SearchLocations,
     InitiateQuery,
     SearchReports,
