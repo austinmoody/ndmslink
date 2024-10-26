@@ -22,9 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.stream.Collectors;
-
-
 
 public class FhirDataProvider {
   private static final Logger logger = LoggerFactory.getLogger(FhirDataProvider.class);
@@ -375,13 +372,13 @@ public class FhirDataProvider {
   private void addResourceExclusionsToQuery(IQuery<IBaseBundle> query,
                                             String resourceType,
                                             List<RetainResourceConfig> retainResources) {
-    String excludeIds = retainResources.stream().filter(
-            rrc -> rrc.getResourceType().equals(resourceType)
-    ).map(RetainResourceConfig::getResourceId)
-            .collect(Collectors.joining(","));
-
-    if (!excludeIds.isEmpty()) {
-      query.where(new StringClientParam("identifier:not").matches().values(excludeIds));
+    // FYI - tried to do a 1 liner to set the identifier:not to a list separated by commas
+    // this work via curl but is bugging out here.  So adding a different where for each
+    // does the trick.  ALM
+    for (RetainResourceConfig retainResource : retainResources) {
+      if (resourceType.equals(retainResource.getResourceType())) {
+        query.where(new StringClientParam("identifier:not").matches().value(retainResource.getResourceId()));
+      }
     }
   }
 
