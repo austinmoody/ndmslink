@@ -4,7 +4,6 @@ import com.lantanagroup.link.FhirDataProvider;
 import com.lantanagroup.link.IReportGenerationDataEvent;
 import com.lantanagroup.link.model.ReportContext;
 import com.lantanagroup.link.model.ReportCriteria;
-import com.lantanagroup.link.nhsn.FixResourceId;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.DomainResource;
 import org.hl7.fhir.r4.model.MeasureReport;
