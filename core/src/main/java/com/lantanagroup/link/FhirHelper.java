@@ -600,6 +600,7 @@ public class FhirHelper {
     Export,
     Send,
     LOCATION_CREATE_UPDATE,
+    TOTALS_CREATE_UPDATE,
     SearchLocations,
     InitiateQuery,
     SearchReports,
