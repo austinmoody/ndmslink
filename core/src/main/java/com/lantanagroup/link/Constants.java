@@ -56,7 +56,9 @@ public class Constants {
   public static final String DOCUMENT_REFERENCE_VERSION_URL = "https://www.cdc.gov/nhsn/fhir/nhsnlink/StructureDefinition/nhsnlink-report-version";
   public static final Coding SCOOP_DATA = new Coding().setCode("scoop-data").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Scoop Data");
   public static final Coding PATIENT_LIST_PULL = new Coding().setCode("patient-list-pull").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Patient List Pull");
-  public static final Coding LOCATION_CREATE_UPDATE = new Coding().setCode("location-update").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Location Update");
+  public static final Coding LOCATION_CREATE_UPDATE = new Coding().setCode("location-create-update").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Location Create/Update");
+  public static final Coding TOTALS_CREATE_UPDATE = new Coding().setCode("totals-create-update").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Totals Create/Update");
+  public static final String MEASURE_REPORT_PROFILE = "http://hl7.org/fhir/uv/saner/StructureDefinition/PublicHealthMeasureReport";
 
   public static final Coding REMOTE_ADDRESS = new Coding()
           .setSystem("https://thsa1.sanerproject.org:10443/fhir/CodeSystem/task-input-types")
