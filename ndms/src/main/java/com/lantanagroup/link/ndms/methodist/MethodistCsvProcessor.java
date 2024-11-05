@@ -10,6 +10,7 @@ import com.lantanagroup.link.config.api.ApiDataStoreConfig;
 import com.lantanagroup.link.config.api.CsvProcessor;
 import com.lantanagroup.link.csv.ICsvProcessor;
 import com.lantanagroup.link.model.ReportCriteria;
+import com.lantanagroup.link.ndms.NdmsConstants;
 import com.lantanagroup.link.ndms.NdmsUtility;
 import com.opencsv.bean.CsvToBean;
 import com.opencsv.bean.CsvToBeanBuilder;
@@ -114,6 +115,9 @@ public class MethodistCsvProcessor implements ICsvProcessor {
     }
 
     private void verifyAndProcessOptions() {
+
+        final String errorTemplate = "CSV Processor not configured with '%s' option";
+
         if (this.csvProcessorConfig == null) {
             throw new InternalErrorException("CSV Processor not configured");
         }
@@ -128,7 +132,7 @@ public class MethodistCsvProcessor implements ICsvProcessor {
         String codeSystemOptionName = "target-bed-types-code-system";
         if (this.csvProcessorConfig.getOptions().get(codeSystemOptionName) == null) {
             throw new InternalErrorException(
-                    String.format("CSV Processor not configured with '%s' option", codeSystemOptionName)
+                    String.format(errorTemplate, codeSystemOptionName)
             );
         }
         this.targetBedTypesCodeSystem = this.csvProcessorConfig.getOptions().get(codeSystemOptionName);
@@ -139,7 +143,7 @@ public class MethodistCsvProcessor implements ICsvProcessor {
         String conceptMapOptionName = "target-to-ndms-concept-map";
         if (this.csvProcessorConfig.getOptions().get(conceptMapOptionName) == null) {
             throw new InternalErrorException(
-                    String.format("CSV Processor not configured with '%s' option", conceptMapOptionName)
+                    String.format(errorTemplate, conceptMapOptionName)
             );
         }
         this.targetNdmsConceptMap = this.csvProcessorConfig.getOptions().get(conceptMapOptionName);
@@ -147,7 +151,7 @@ public class MethodistCsvProcessor implements ICsvProcessor {
         String removeBedTypesOptionName = "remove-bed-types";
         if (this.csvProcessorConfig.getOptions().get(removeBedTypesOptionName) == null) {
             throw new InternalErrorException(
-                    String.format("CSV Processor not configured with '%s' option",removeBedTypesOptionName)
+                    String.format(errorTemplate, removeBedTypesOptionName)
             );
         }
         this.removeBedTypes = Arrays.stream(
@@ -159,7 +163,7 @@ public class MethodistCsvProcessor implements ICsvProcessor {
         String occupiedBedTypesOptionName = "occupied-bed-types";
         if (this.csvProcessorConfig.getOptions().get(occupiedBedTypesOptionName) == null) {
             throw new InternalErrorException(
-                    String.format("CSV Processor not configured with '%s' option",occupiedBedTypesOptionName)
+                    String.format(errorTemplate, occupiedBedTypesOptionName)
             );
         }
         this.occupiedBedTypes = Arrays.stream(
@@ -171,7 +175,7 @@ public class MethodistCsvProcessor implements ICsvProcessor {
         String availableBedTypesOptionName = "available-bed-types";
         if (this.csvProcessorConfig.getOptions().get(availableBedTypesOptionName) == null) {
             throw new InternalErrorException(
-                    String.format("CSV Processor not configured with '%s' option",availableBedTypesOptionName)
+                    String.format(errorTemplate, availableBedTypesOptionName)
             );
         }
         this.availableBedTypes = Arrays.stream(
@@ -312,13 +316,9 @@ public class MethodistCsvProcessor implements ICsvProcessor {
     private MeasureReport.MeasureReportGroupComponent getFacilityOverallTotals(Location location, List<MethodistDataModel> locationData) {
         // Let's add the group & counts for the whole facility
         MeasureReport.MeasureReportGroupComponent overallGroup = new MeasureReport.MeasureReportGroupComponent();
-        CodeableConcept overallGroupCodeableConcept = new CodeableConcept();
-        Coding overallGroupCoding = new Coding();
-        // Need to pull System from somewhere...?
-        overallGroupCoding.setSystem("FIXME");
-        overallGroupCoding.setCode("Beds");
-        overallGroupCodeableConcept.addCoding(overallGroupCoding);
+        CodeableConcept overallGroupCodeableConcept = new CodeableConcept(NdmsConstants.NDMS_BEDS_CODE);
         overallGroup.setCode(overallGroupCodeableConcept);
+
         // 3 populations
         // numTotBeds (all for Facility except BLOCKED & OUT_OF_SERVICE
         MeasureReport.MeasureReportGroupPopulationComponent populationGroup = new MeasureReport.MeasureReportGroupPopulationComponent();
@@ -330,11 +330,8 @@ public class MethodistCsvProcessor implements ICsvProcessor {
                         )
                         .count()
         );
-        CodeableConcept populationGroupCodeableConcept = new CodeableConcept();
-        Coding populationGroupCoding = new Coding();
-        populationGroupCoding.setSystem("FIXME");
-        populationGroupCoding.setCode("numTotBeds");
-        populationGroupCodeableConcept.addCoding(populationGroupCoding);
+
+        CodeableConcept populationGroupCodeableConcept = new CodeableConcept(NdmsConstants.NDMS_OVERALL_TOTAL_CODE);
         populationGroup.setCode(populationGroupCodeableConcept);
         overallGroup.addPopulation(populationGroup);
 
@@ -348,11 +345,7 @@ public class MethodistCsvProcessor implements ICsvProcessor {
                         )
                         .count()
         );
-        populationGroupCodeableConcept = new CodeableConcept();
-        populationGroupCoding = new Coding();
-        populationGroupCoding.setSystem("FIXME");
-        populationGroupCoding.setCode("numTotBedsOcc");
-        populationGroupCodeableConcept.addCoding(populationGroupCoding);
+        populationGroupCodeableConcept = new CodeableConcept(NdmsConstants.NDMS_OVERALL_TOTAL_CODE);
         populationGroup.setCode(populationGroupCodeableConcept);
         overallGroup.addPopulation(populationGroup);
 
@@ -366,11 +359,7 @@ public class MethodistCsvProcessor implements ICsvProcessor {
                         )
                         .count()
         );
-        populationGroupCodeableConcept = new CodeableConcept();
-        populationGroupCoding = new Coding();
-        populationGroupCoding.setSystem("FIXME");
-        populationGroupCoding.setCode("numTotBedsAvail");
-        populationGroupCodeableConcept.addCoding(populationGroupCoding);
+        populationGroupCodeableConcept = new CodeableConcept(NdmsConstants.NDMS_OVERALL_TOTAL_CODE);
         populationGroup.setCode(populationGroupCodeableConcept);
         overallGroup.addPopulation(populationGroup);
 
