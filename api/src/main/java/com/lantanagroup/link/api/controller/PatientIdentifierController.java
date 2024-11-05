@@ -176,8 +176,6 @@ public class PatientIdentifierController extends BaseController {
               () -> patientListPull(user, task.getId(), location)
       );
 
-      // TODO: Add FHIR Audit
-
     } catch (Exception ex) {
       String errorMessage = String.format("Issue with starting patient list pull API call: %s", ex.getMessage());
       logger.error(errorMessage);
@@ -243,6 +241,10 @@ public class PatientIdentifierController extends BaseController {
       );
       task.setStatus(Task.TaskStatus.COMPLETED);
 
+      this.getFhirDataProvider().audit(task,
+              user.getJwt(),
+              FhirHelper.AuditEventTypes.PATIENT_LIST_PULL,
+              "Successfully Initiated Patient List Pull");
     } catch (Exception ex) {
       String errorMessage = String.format("Issue with patientListPull: %s", ex.getMessage());
       logger.error(errorMessage);

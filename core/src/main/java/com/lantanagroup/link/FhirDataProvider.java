@@ -138,6 +138,13 @@ public class FhirDataProvider {
 
   }
 
+  public Bundle findLocationByIdentifierValue(String identifierValue) {
+    return this.client.search().forResource(Location.class)
+            .where(
+                    Location.IDENTIFIER.exactly().systemAndValues("", identifierValue)
+            ).returnBundle(Bundle.class).execute();
+  }
+
   public Bundle findListByIdentifierAndDate(String system, String value, String start, String end) {
     return this.client
             .search()

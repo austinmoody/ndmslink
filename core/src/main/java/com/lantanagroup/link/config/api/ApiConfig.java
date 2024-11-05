@@ -25,13 +25,7 @@ import java.util.List;
 public class ApiConfig {
   private static final Logger logger = LoggerFactory.getLogger(ApiConfig.class);
 
-  //TODO: Remove after debug
-  private Boolean debugOutput = false;
-  private String debugOutputEncounterFile;
-  private String debugOutputLocationFile;
-  private String debugOutputLocationAliasFile;
-
-  //TODO: remove this when we have a better plan
+  //TODO: Repace this with a ConceptMap
   private String nhsnBedListCsvFile;
 
   //REFACTOR - holds ID for CodeSystem that has TRAC2ES bed codes. Assumed to be on Evaluation Service
@@ -137,6 +131,8 @@ public class ApiConfig {
   private List<GenerateReportConfig> generateReportConfiguration;
 
   private EpicTotalsData epicTotalsData;
+
+  private List<CsvProcessor> csvProcessors;
 
   private List<PatientListPullConfig> patientListPull;
 

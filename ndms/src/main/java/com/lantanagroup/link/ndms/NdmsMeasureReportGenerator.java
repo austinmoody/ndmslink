@@ -24,14 +24,9 @@ import java.util.stream.Collectors;
 @Component
 public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
     private static final Logger logger = LoggerFactory.getLogger(NdmsMeasureReportGenerator.class);
-    private final ApiConfig apiConfig;
 
     private CodeSystem trac2esCodeSystem = null;
     private final NdmsUtility ndmsUtility = new NdmsUtility();
-
-    public NdmsMeasureReportGenerator(ApiConfig apiConfig) {
-        this.apiConfig = apiConfig;
-    }
 
     @Override
     public void generate(StopwatchManager stopwatchManager,
@@ -47,13 +42,6 @@ public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
                 : ForkJoinPool.commonPool();
 
         try {
-
-            //TODO: Remove this for DEBUG only
-            if (apiConfig.getDebugOutput()) {
-                writeLine(apiConfig.getDebugOutputEncounterFile(), "EncounterId,EncounterStatus,EncounterPeriodStart,EncounterPeriodEnd");
-                writeLine(apiConfig.getDebugOutputLocationFile(), "locationId,encounterId,locationDisplay,locationPeriodStart,locationPeriodEnd");
-                writeLine(apiConfig.getDebugOutputLocationAliasFile(), "randomId,locationId,encounterId,alias");
-            }
 
             final Date startDate = Helper.parseFhirDate(criteria.getPeriodStart());
             final Date endDate = Helper.parseFhirDate(criteria.getPeriodEnd());
@@ -71,14 +59,9 @@ public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
                         try {
                             String patientDataBundleId = ReportIdHelper.getPatientDataBundleId(reportContext.getMasterIdentifier(), patient.getId());
 
-                            // get patient bundle from the fhirserver
+                            // get patient bundle from the FHIR Data Store Server
                             FhirDataProvider fhirStoreProvider = new FhirDataProvider(config.getDataStore());
                             Bundle patientBundle = fhirStoreProvider.getBundleById(patientDataBundleId);
-
-                            // TODO: Saving this to a CSV is a total Debug situation
-                            if (apiConfig.getDebugOutput()) {
-                                saveCsvDebug(patientBundle, apiConfig);
-                            }
 
                             // Pull Location identifiers from Encounters if the Location has a period.start / period.end
                             // that falls in range of the passed in start/end dates when generating the reports.
@@ -148,7 +131,7 @@ public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
                         // Tag individual MeasureReport as patient-data as it references a patient and will be found for expunge
                         patientMeasureReport.getMeta().addTag(Constants.MainSystem, Constants.patientDataTag,"");
 
-                        logger.info(String.format("Persisting patient %s measure report with id %s", patient, measureReportId));
+                        logger.info("Persisting patient {} measure report with id {}", patient, measureReportId);
                         Stopwatch stopwatch = stopwatchManager.start("store-measure-report");
                         reportContext.getFhirProvider().updateResource(patientMeasureReport);
                         stopwatch.stop();
@@ -274,89 +257,4 @@ public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
 
         return codeableConcept;
     }
-
-    private void saveCsvDebug(Bundle patientBundle, ApiConfig apiConfig) {
-
-        // Loop & Save Encounter Information
-        for (Bundle.BundleEntryComponent bec : patientBundle.getEntry()) {
-            if (bec.getResource() instanceof Encounter) {
-                Encounter encounter = (Encounter) bec.getResource();
-                String encounterPeriodStart = "";
-                String encounterPeriodEnd = "";
-                if (encounter.getPeriod() != null) {
-                    if (encounter.getPeriod().getStart() != null) {
-                        encounterPeriodStart = encounter.getPeriod().getStart().toString();
-                    }
-
-                    if (encounter.getPeriod().getEnd() != null) {
-                        encounterPeriodEnd = encounter.getPeriod().getEnd().toString();
-                    }
-                }
-                String encounterLine = String.format("%s,%s,%s,%s",encounter.getId(),
-                        encounter.getStatus().name(),
-                        encounterPeriodStart,
-                        encounterPeriodEnd);
-                writeLine(apiConfig.getDebugOutputEncounterFile(), encounterLine);
-
-                // Loop Encounter Locations
-                for (Encounter.EncounterLocationComponent elc : encounter.getLocation()) {
-                    String locationPeriodStart = "";
-                    String locationPeriodEnd = "";
-                    if (elc.getPeriod() != null) {
-                        if (elc.getPeriod().getStart() != null) {
-                            locationPeriodStart = elc.getPeriod().getStart().toString();
-                        }
-
-                        if (elc.getPeriod().getEnd() != null) {
-                            locationPeriodEnd = elc.getPeriod().getEnd().toString();
-                        }
-                    }
-
-                    String locationLine = String.format("%s,%s,%s,%s,%s",
-                            elc.getLocation().getReference(),
-                            encounter.getId(),
-                            elc.getLocation().getDisplay(),
-                            locationPeriodStart,
-                            locationPeriodEnd);
-                    writeLine(apiConfig.getDebugOutputLocationFile(), locationLine);
-
-                    // Pull Loop Alias
-                    Optional<Location> aliasLocation = patientBundle
-                            .getEntry()
-                            .stream()
-                            .map(Bundle.BundleEntryComponent::getResource)
-                            .filter(Location.class::isInstance)
-                            .map(Location.class::cast)
-                            .filter(loc -> loc.getIdElement().getIdPart().equals(elc.getLocation().getReference().replaceAll("Location/","")))
-                            .findAny();
-
-                    if (aliasLocation.isPresent()) {
-
-                        for (StringType alias : aliasLocation.get().getAlias()) {
-                            String locationAliasLine = String.format("%s,%s,%s,%s",
-                                    UUID.randomUUID().toString(),
-                                    elc.getLocation().getReference(),
-                                    encounter.getId(),
-                                    alias.getValue()
-                            );
-                            writeLine(apiConfig.getDebugOutputLocationAliasFile(), locationAliasLine);
-                        }
-                    }
-                }
-
-            }
-        }
-    }
-
-    private void writeLine(String fileName, String line) {
-        try(FileWriter fw = new FileWriter(fileName, true);
-            BufferedWriter bw = new BufferedWriter(fw);
-            PrintWriter out = new PrintWriter(bw))
-        {
-            out.println(line);
-        } catch (IOException e) {
-            logger.error(e.getMessage());
-        }
-    }
-
 }
