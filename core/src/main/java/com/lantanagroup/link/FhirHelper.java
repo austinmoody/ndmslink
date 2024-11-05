@@ -601,6 +601,8 @@ public class FhirHelper {
     Send,
     LOCATION_CREATE_UPDATE,
     TOTALS_CREATE_UPDATE,
+    CSV_TO_MEASUREREPORT_CONVERSION,
+    PATIENT_LIST_PULL,
     SearchLocations,
     InitiateQuery,
     SearchReports,

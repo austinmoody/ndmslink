@@ -1,12 +1,11 @@
 package com.lantanagroup.link.api.model;
 
+import com.lantanagroup.link.ReportIdHelper;
 import lombok.Getter;
 import lombok.Setter;
-import org.hl7.fhir.r4.model.Address;
 import org.hl7.fhir.r4.model.ContactPoint;
 import org.hl7.fhir.r4.model.Identifier;
 import org.hl7.fhir.r4.model.Location;
-import org.hl7.fhir.r4.model.codesystems.ContactPointSystem;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
@@ -33,6 +32,12 @@ public class LinkLocation {
         location.setId(this.id);
         location.addIdentifier(
                 new Identifier().setValue(this.id)
+        );
+        // Sometimes we are stuck searching for Locations using only the string that ultimately
+        // lands in Location.name.  Having issue getting FHIR Data Store to be able to successfully
+        // search by name.  So using our standard ReportIdHelper.hash here.
+        location.addIdentifier(
+                new Identifier().setValue(ReportIdHelper.hash(this.name))
         );
         location.setStatus(Location.LocationStatus.ACTIVE);
         location.setName(this.name);
