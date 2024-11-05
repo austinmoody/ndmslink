@@ -345,7 +345,7 @@ public class MethodistCsvProcessor implements ICsvProcessor {
                         )
                         .count()
         );
-        populationGroupCodeableConcept = new CodeableConcept(NdmsConstants.NDMS_OVERALL_TOTAL_CODE);
+        populationGroupCodeableConcept = new CodeableConcept(NdmsConstants.NDMS_OVERALL_OCC_CODE);
         populationGroup.setCode(populationGroupCodeableConcept);
         overallGroup.addPopulation(populationGroup);
 
@@ -359,7 +359,7 @@ public class MethodistCsvProcessor implements ICsvProcessor {
                         )
                         .count()
         );
-        populationGroupCodeableConcept = new CodeableConcept(NdmsConstants.NDMS_OVERALL_TOTAL_CODE);
+        populationGroupCodeableConcept = new CodeableConcept(NdmsConstants.NDMS_OVERALL_AVAIL_CODE);
         populationGroup.setCode(populationGroupCodeableConcept);
         overallGroup.addPopulation(populationGroup);
 

@@ -64,7 +64,7 @@ public class Constants {
   public static final Coding LOCATION_CREATE_UPDATE = new Coding().setCode("location-create-update").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Location Create/Update");
   public static final Coding TOTALS_CREATE_UPDATE = new Coding().setCode("totals-create-update").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("Totals Create/Update");
   public static final String MEASURE_REPORT_PROFILE = "http://hl7.org/fhir/uv/saner/StructureDefinition/PublicHealthMeasureReport";
-  public static final Coding CSV_TO_MEASUREREPORT = new Coding().setCode("csv-to-measurereport").setSystem(MEASURE_REPORT_PROFILE).setDisplay("CSV To Measurereport");
+  public static final Coding CSV_TO_MEASUREREPORT = new Coding().setCode("csv-to-measurereport").setSystem(SANER_JOB_TYPE_SYSTEM).setDisplay("CSV To Measurereport");
 
   public static final Coding REMOTE_ADDRESS = new Coding()
           .setSystem("https://thsa1.sanerproject.org:10443/fhir/CodeSystem/task-input-types")
