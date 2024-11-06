@@ -98,9 +98,9 @@ public class ReportController extends BaseController {
   }
 
   @PostMapping("/generate")
-  public ResponseEntity<Object> newGenerateReport(@AuthenticationPrincipal LinkCredentials user,
-                                            HttpServletRequest request,
-                                            @Valid @RequestBody GenerateReport generateReport) {
+  public ResponseEntity<Object> generateReport(@AuthenticationPrincipal LinkCredentials user,
+                                               HttpServletRequest request,
+                                               @Valid @RequestBody GenerateReport generateReport) {
 
     // TODO - redo this regenerate thing.  It was all tied to DocumentReference and to be honest I don't care about
     // that anymore.  So we want ot search for the MeasureReport aggregate that would get created first.
