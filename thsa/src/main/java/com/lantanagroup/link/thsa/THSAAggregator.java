@@ -52,7 +52,7 @@ public class THSAAggregator extends GenericAggregator implements IReportAggregat
     CodeableConcept codeableConcept = new CodeableConcept();
     Coding coding = new Coding();
     coding.setCode(populationCode);
-    coding.setSystem(Constants.MeasuredValues);
+    coding.setSystem(Constants.MEASURED_VALUES);
     coding.setDisplay(populationDisplay);
     List<Coding> codingList = new ArrayList<>();
     codingList.add(coding);

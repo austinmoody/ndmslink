@@ -2,7 +2,6 @@ package com.lantanagroup.link.nhsn;
 
 import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.FhirDataProvider;
-import com.lantanagroup.link.FhirHelper;
 import com.lantanagroup.link.IReportGenerationDataEvent;
 import com.lantanagroup.link.model.ReportContext;
 import com.lantanagroup.link.model.ReportCriteria;
@@ -28,7 +27,7 @@ public class EncounterStatusTransformer implements IReportGenerationDataEvent {
         Encounter patientEncounter = (Encounter) patientResource.getResource();
         if (patientEncounter.getPeriod().hasEnd()) {
           Extension previous = new Extension();
-          previous.setUrl(Constants.OriginalEncounterStatus);
+          previous.setUrl(Constants.ORIGINAL_ENCOUNTER_STATUS);
           Coding coding = new Coding();
           coding.setCode(patientEncounter.getStatus().toString());
           previous.setValue(coding);

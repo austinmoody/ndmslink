@@ -56,7 +56,7 @@ public class CsvProcessorController extends BaseController {
             @PathVariable String locationId
             ) {
 
-        Task task = TaskHelper.getNewTask(user, request, Constants.CSV_TO_MEASUREREPORT);
+        Task task = TaskHelper.getNewTask(user, request, Constants.CSV_TO_MEASURE_REPORT);
         FhirDataProvider fhirDataProvider = getFhirDataProvider();
 
         try {

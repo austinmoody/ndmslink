@@ -129,7 +129,7 @@ public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
                         String measureReportId = ReportIdHelper.getPatientMeasureReportId(measureContext.getReportId(), patient.getId());
                         patientMeasureReport.setId(measureReportId);
                         // Tag individual MeasureReport as patient-data as it references a patient and will be found for expunge
-                        patientMeasureReport.getMeta().addTag(Constants.MainSystem, Constants.patientDataTag,"");
+                        patientMeasureReport.getMeta().addTag(Constants.MAIN_SYSTEM, Constants.PATIENT_DATA_TAG,"");
 
                         logger.info("Persisting patient {} measure report with id {}", patient, measureReportId);
                         Stopwatch stopwatch = stopwatchManager.start("store-measure-report");

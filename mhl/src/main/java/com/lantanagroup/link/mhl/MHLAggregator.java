@@ -30,9 +30,9 @@ public class MHLAggregator extends ReportAggregator {
           "http://terminology.hl7.org/CodeSystem/measure-population";
   private static final String INITIAL_POPULATION_CODE = "initial-population";
   private static final String INITIAL_POPULATION_CHILDREN_SYSTEM =
-          String.format("%s/measure-population", Constants.MHLSystem);
+          String.format("%s/measure-population", Constants.MHL_SYSTEM);
   private static final String INITIAL_POPULATION_CHILDREN_CODE = "initial-population-children";
-  private static final String TOTAL_NUMBER_OF_RECORDS_QUERIED_SYSTEM =   String.format("%s/CodeSystem/measure-population", Constants.MHLSystem);;
+  private static final String TOTAL_NUMBER_OF_RECORDS_QUERIED_SYSTEM =   String.format("%s/CodeSystem/measure-population", Constants.MHL_SYSTEM);;
   private static final String TOTAL_NUMBER_OF_RECORDS_QUERIED_CODE = "total-queried-records";
   private static final Logger logger = LoggerFactory.getLogger(MHLAggregator.class);
 

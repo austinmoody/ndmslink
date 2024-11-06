@@ -280,9 +280,9 @@ public class PatientIdentifierController extends BaseController {
               .setEnd(Helper.getEndOfDay(sourceList.getDate(), 0));
     }
 
-    target.addExtension(Constants.ApplicablePeriodExtensionUrl, period);
+    target.addExtension(Constants.APPLICABLE_PERIOD_EXTENSION_URL, period);
     target.addIdentifier()
-            .setSystem(Constants.MainSystem)
+            .setSystem(Constants.MAIN_SYSTEM)
             .setValue(locationId);
     target.setStatus(ListResource.ListStatus.CURRENT);
     target.setMode(ListResource.ListMode.WORKING);
@@ -397,12 +397,12 @@ public class PatientIdentifierController extends BaseController {
 
     Identifier listLocationIdentifier = null;
     for (Identifier identifier : listResource.getIdentifier()) {
-      if (identifier.getSystem().equals(Constants.MainSystem)) {
+      if (identifier.getSystem().equals(Constants.MAIN_SYSTEM)) {
         listLocationIdentifier = identifier;
       }
     }
     if (listLocationIdentifier == null) {
-      String errorMessage = String.format("Patient List %s is missing identifier associated with system '%s'", listResource.getId(), Constants.MainSystem);
+      String errorMessage = String.format("Patient List %s is missing identifier associated with system '%s'", listResource.getId(), Constants.MAIN_SYSTEM);
       logger.error(errorMessage);
       throw new FHIRException(errorMessage);
     }
@@ -511,7 +511,7 @@ public class PatientIdentifierController extends BaseController {
 
       // TODO: Call checkMeasureIdentifier here; remove the calls in getPatientIdentifierListXML/JSON
 
-      Extension applicablePeriodExt = list.getExtensionByUrl(Constants.ApplicablePeriodExtensionUrl);
+      Extension applicablePeriodExt = list.getExtensionByUrl(Constants.APPLICABLE_PERIOD_EXTENSION_URL);
 
       if (applicablePeriodExt == null) {
         String msg = "Census list applicable-period extension is required";
@@ -575,7 +575,7 @@ public class PatientIdentifierController extends BaseController {
     ListResource list = new ListResource();
     list.addIdentifier(IdentifierHelper.fromString(reportTypeId));
     List<Extension> applicablePeriodExtensionUrl = new ArrayList<>();
-    applicablePeriodExtensionUrl.add(new Extension(Constants.ApplicablePeriodExtensionUrl));
+    applicablePeriodExtensionUrl.add(new Extension(Constants.APPLICABLE_PERIOD_EXTENSION_URL));
     applicablePeriodExtensionUrl.get(0).setValue(csvList.get(0).getPeriod());
     list.setExtension(applicablePeriodExtensionUrl);
     //list.setDateElement(new DateTimeType(listDate));

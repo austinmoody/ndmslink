@@ -29,7 +29,7 @@ public class PatientsOfInterest implements IPatientOfInterest {
         context.getPatientsOfInterest().clear();
 
         String listIdentifierValue = context.getReportLocation().getIdElement().getIdPart();
-        String listIdentifierSystem = Constants.MainSystem;
+        String listIdentifierSystem = Constants.MAIN_SYSTEM;
 
         logger.info("Searching for patient census lists with identifier {}|{} and applicable period {}-{}", listIdentifierSystem, listIdentifierValue, criteria.getPeriodStart(), criteria.getPeriodEnd());
         Bundle bundle = context.getFhirProvider().findListByIdentifierAndDate(

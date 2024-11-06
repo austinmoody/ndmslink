@@ -129,7 +129,7 @@ public class ResourceIdChanger {
   }
 
   private String getNewId(String rId) {
-    String newId = rId.replace(Constants.UuidPrefix, "");
+    String newId = rId.replace(Constants.UUID_PREFIX, "");
     if (newId.length() > 64) {
       newId = "hash-" + Integer.toHexString(newId.hashCode());
     }
@@ -146,7 +146,7 @@ public class ResourceIdChanger {
     // Find resources that have invalid IDs
     List<Bundle.BundleEntryComponent> invalidEntries = this.bundle.getEntry().stream()
             .filter(e -> e.getResource() != null && e.getResource().getIdElement() != null && e.getResource().getIdElement().getIdPart() != null &&
-                    (e.getResource().getIdElement().getIdPart().length() > 64 || e.getResource().getIdElement().getIdPart().contains(Constants.UuidPrefix)))
+                    (e.getResource().getIdElement().getIdPart().length() > 64 || e.getResource().getIdElement().getIdPart().contains(Constants.UUID_PREFIX)))
             .collect(Collectors.toList());
     // Create a map where key = old id, value = new id (a hash of the old id)
     Map<IdType, IdType> newIds = invalidEntries.stream().map(Bundle.BundleEntryComponent::getResource).map(res -> {
@@ -187,7 +187,7 @@ public class ResourceIdChanger {
       if (r.getReference() == null) return false;
       String[] refParts = r.getReference().split("/");
       if (refParts.length != 2) return false;                 // Skip canonical references
-      if (refParts[1].length() <= 64 && !refParts[1].contains(Constants.UuidPrefix))
+      if (refParts[1].length() <= 64 && !refParts[1].contains(Constants.UUID_PREFIX))
         return false;           // Skip references that aren't invalid
       return true;
     }).forEach(ref -> {

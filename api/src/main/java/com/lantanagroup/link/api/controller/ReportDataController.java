@@ -384,8 +384,8 @@ public class ReportDataController extends BaseController {
       if (Boolean.TRUE.equals(filterPatientTag)) {
         bundle = fhirDataProvider.getResourcesSummaryByCountTagLastUpdatedExclude(resourceType,
                 count,
-                Constants.MainSystem,
-                Constants.patientDataTag,
+                Constants.MAIN_SYSTEM,
+                Constants.PATIENT_DATA_TAG,
                 searchBeforeDate,
                 dataGovernanceConfig.getRetainResources());
       } else {

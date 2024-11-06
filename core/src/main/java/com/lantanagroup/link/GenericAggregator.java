@@ -41,7 +41,7 @@ public abstract class GenericAggregator implements IReportAggregator {
       }
 
       if (this.config.getMeasureLocation().getLatitude() != null || this.config.getMeasureLocation().getLongitude() != null) {
-        Extension positionExt = new Extension(Constants.ReportPositionExtUrl);
+        Extension positionExt = new Extension(Constants.REPORT_POSITION_EXT_URL);
 
         if (this.config.getMeasureLocation().getLongitude() != null) {
           Extension longExt = new Extension("longitude");

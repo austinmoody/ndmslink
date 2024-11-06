@@ -500,7 +500,7 @@ public class OAuth2Helper {
     Claim claim = claims.get("realm_access");
     if (claim != null) {
       Map<String, Object> backMap = claim.asMap();
-      List<String> roles = (ArrayList) backMap.get(Constants.Roles);
+      List<String> roles = (ArrayList) backMap.get(Constants.ROLES);
       return roles.toArray(new String[roles.size()]);
     }
     return noRoles;

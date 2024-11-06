@@ -32,7 +32,7 @@ public class AuthInterceptor extends AuthorizationInterceptor {
 
     // readConsumerConfig
     Permission[] permissions = consumerConfig.getPermissions();
-    String[] jwtRoles = theRequestDetails.getParameters().get(Constants.Roles);
+    String[] jwtRoles = theRequestDetails.getParameters().get(Constants.ROLES);
     Set<String> userRoleSet = jwtRoles != null ? Arrays.stream(jwtRoles).collect(Collectors.toSet()) : new HashSet<>();
 
     String azorica = consumerConfig.getAzorica();
@@ -50,7 +50,7 @@ public class AuthInterceptor extends AuthorizationInterceptor {
       Role appliedRole = null;
       try {
         // validate Fhir resource type
-        Class<? extends IBaseResource> resourceClass = Class.forName(Constants.FhirResourcesPackageName + resourceType).asSubclass(IBaseResource.class);
+        Class<? extends IBaseResource> resourceClass = Class.forName(Constants.FHIR_RESOURCES_PACKAGE_NAME + resourceType).asSubclass(IBaseResource.class);
         if (permission.getRoles() != null) {
           Optional<Role> userRole = Arrays.stream(permission.getRoles()).filter(role -> !defaultRole.equals(role.getName()) && userRoleSet.contains(role.getName())).collect(Collectors.toList()).stream().findFirst();
           if (userRole.isPresent()) {
