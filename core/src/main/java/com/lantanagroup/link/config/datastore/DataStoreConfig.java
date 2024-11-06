@@ -10,7 +10,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.validation.annotation.Validated;
 
+import javax.validation.constraints.AssertTrue;
 import java.util.HashMap;
+import java.util.List;
 
 @Getter
 @Setter
@@ -22,33 +24,36 @@ public class DataStoreConfig {
   /**
    * <strong>datastore.data-source</strong><br/>Persistence configuration (i.e. Postgres connection information) for the data store
    */
-  @Getter
   private DataSourceConfig dataSource;
 
   /**
    * <strong>datastore.oauth</strong><br/>OAuth configuration of the data store
    */
-  @Getter
   private DataStoreOAuthConfig oauth;
 
   /**
    * <strong>datastore.basic-auth-users</strong><br/>Key-Value pair of usernames and passwords that have access to the data store
    */
-  @Getter
   private HashMap<String, String> basicAuthUsers;
 
   /**
    * <strong>datastore.public-address</strong><br/>The public address that the data store is exposed at.
    */
-  @Getter
   private String publicAddress;
 
   /**
    * <strong>datastore.cors</strong><br>CORS configuration used for browser interaction with the Data Store
    */
-  @Getter
   private CorsConfig cors;
 
-  @Getter
   private DataStoreDaoConfig dao;
+
+  private boolean ipFilterEnabled = true;
+
+  private List<String> allowedIps;
+
+  @AssertTrue(message = "allowed-ips must not be empty when ip-filter-enabled is true")
+  private boolean isValidIpConfiguration() {
+    return !ipFilterEnabled || (allowedIps != null && !allowedIps.isEmpty());
+  }
 }
