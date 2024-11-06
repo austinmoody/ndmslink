@@ -317,7 +317,7 @@ public class FhirDataProvider {
   public Bundle searchReportDefinition(String system, String value) {
     return client.search()
             .forResource(Bundle.class)
-            .withTag(Constants.MainSystem, Constants.ReportDefinitionTag)
+            .withTag(Constants.MAIN_SYSTEM, Constants.REPORT_DEFINITION_TAG)
             .where(Bundle.IDENTIFIER.exactly().systemAndCode(system, value))
             .returnBundle(Bundle.class)
             .cacheControl(new CacheControlDirective().setNoCache(true))
@@ -328,8 +328,8 @@ public class FhirDataProvider {
     return client
             .search()
             .forResource(Practitioner.class)
-            .withTag(Constants.MainSystem, Constants.LinkUserTag)
-            .where(Practitioner.IDENTIFIER.exactly().systemAndValues(Constants.MainSystem, practitionerId))
+            .withTag(Constants.MAIN_SYSTEM, Constants.LINK_USER_TAG)
+            .where(Practitioner.IDENTIFIER.exactly().systemAndValues(Constants.MAIN_SYSTEM, practitionerId))
             .returnBundle(Bundle.class)
             .cacheControl(new CacheControlDirective().setNoCache(true))
             .execute();

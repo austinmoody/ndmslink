@@ -61,7 +61,7 @@ public class ParklandExcelToMeasureReport implements IUploadFileToMeasureReport 
         measureReport.setDate(new Date());
         MeasureReport.MeasureReportGroupComponent group = new MeasureReport.MeasureReportGroupComponent();
         Coding ventCoding = new Coding();
-        ventCoding.setSystem(Constants.MeasuredValues);
+        ventCoding.setSystem(Constants.MEASURED_VALUES);
         ventCoding.setCode("vents");
         group.setCode(new CodeableConcept(ventCoding));
 
@@ -76,7 +76,7 @@ public class ParklandExcelToMeasureReport implements IUploadFileToMeasureReport 
     private MeasureReport.MeasureReportGroupPopulationComponent getGroupPop(String type, XSSFSheet sheet, int row, int col) {
         MeasureReport.MeasureReportGroupPopulationComponent pop = new MeasureReport.MeasureReportGroupPopulationComponent();
         Coding coding = new Coding();
-        coding.setSystem(Constants.MeasuredValues);
+        coding.setSystem(Constants.MEASURED_VALUES);
         coding.setCode(type);
         coding.setDisplay(type);
         pop.setCode(new CodeableConcept(coding));

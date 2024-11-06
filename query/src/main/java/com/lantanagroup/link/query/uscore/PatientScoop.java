@@ -179,10 +179,10 @@ public class PatientScoop {
     patientBundle.setId(ReportIdHelper.getPatientDataBundleId(reportId, patient.getIdElement().getIdPart()));
 
     // Tag the bundle as patient-data to be able to quickly look up any data that is related to a patient
-    patientBundle.getMeta().addTag(Constants.MainSystem, Constants.patientDataTag, "Patient Data");
+    patientBundle.getMeta().addTag(Constants.MAIN_SYSTEM, Constants.PATIENT_DATA_TAG, "Patient Data");
     
     // Tag the bundle w/ the id of the Location.  Only purpose is to be able to pull these for debugging purposes
-    patientBundle.getMeta().addTag(Constants.MainSystem, criteria.getLocationId(), criteria.getLocationId());
+    patientBundle.getMeta().addTag(Constants.MAIN_SYSTEM, criteria.getLocationId(), criteria.getLocationId());
 
     return patientBundle;
   }

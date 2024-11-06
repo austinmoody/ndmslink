@@ -72,7 +72,7 @@ public class ApplyConceptMaps implements IReportGenerationDataEvent {
         if (elements.size() > 0) {
           // preserve original code
           Extension originalCode = new Extension();
-          originalCode.setUrl(Constants.ConceptMappingExtension);
+          originalCode.setUrl(Constants.CONCEPT_MAPPING_EXTENSION);
           originalCode.setValue(code.copy());
           code.getExtension().add(originalCode);
           code.setSystem(group.getTarget());

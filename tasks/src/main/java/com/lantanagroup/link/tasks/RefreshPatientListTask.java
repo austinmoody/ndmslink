@@ -107,9 +107,9 @@ public class RefreshPatientListTask {
                     .setEnd(Helper.getEndOfDay(source.getDate(), 0));
         }
 
-        target.addExtension(Constants.ApplicablePeriodExtensionUrl, period);
+        target.addExtension(Constants.APPLICABLE_PERIOD_EXTENSION_URL, period);
         target.addIdentifier()
-                .setSystem(Constants.MainSystem)
+                .setSystem(Constants.MAIN_SYSTEM)
                 .setValue(listLocation);
         target.setStatus(ListResource.ListStatus.CURRENT);
         target.setMode(ListResource.ListMode.WORKING);

@@ -1,7 +1,5 @@
 package com.lantanagroup.link.api.controller;
 
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.interfaces.DecodedJWT;
 import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.FhirDataProvider;
 import com.lantanagroup.link.auth.LinkCredentials;
@@ -11,7 +9,6 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.ListResource;
 import org.hl7.fhir.r4.model.MeasureReport;
-import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.Mockito;
@@ -19,7 +16,6 @@ import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 
 import javax.servlet.http.HttpServletRequest;
-import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 import static org.mockito.Mockito.mock;
@@ -72,7 +68,7 @@ public class ReportDataControllerTest {
     Bundle patientData1 = new Bundle();
     Bundle patientData2 = new Bundle();
     patientData1.setId("patientData1");
-    patientData1.getMeta().addTag(new Coding(Constants.MainSystem, Constants.patientDataTag, "Patient-Data"));
+    patientData1.getMeta().addTag(new Coding(Constants.MAIN_SYSTEM, Constants.PATIENT_DATA_TAG, "Patient-Data"));
     patientData1.getMeta().setLastUpdated(testDate);
     patientData2.setId("patientData2");
     patientData2.getMeta().setLastUpdated(testDate);

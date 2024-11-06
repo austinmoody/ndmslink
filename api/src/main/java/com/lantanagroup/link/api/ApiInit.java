@@ -150,8 +150,8 @@ public class ApiInit {
   private void tagReportDefinitions() {
     FhirDataProvider evaluationService = new FhirDataProvider(config.getEvaluationService());
     logger.info("Tagging Report Definitions with System '{}' and Code '{}'",
-            Constants.MainSystem,
-            Constants.ReportDefinitionTag);
+            Constants.MAIN_SYSTEM,
+            Constants.REPORT_DEFINITION_TAG);
 
     config.getReportDefs().getBundles().parallelStream().forEach(
             bundleConfig -> {
@@ -161,10 +161,10 @@ public class ApiInit {
 
               Bundle measureBundle = evaluationService.getBundleById(bundleConfig.getBundleId());
 
-              if (measureBundle.getMeta().getTag(Constants.MainSystem, Constants.ReportDefinitionTag) == null) {
+              if (measureBundle.getMeta().getTag(Constants.MAIN_SYSTEM, Constants.REPORT_DEFINITION_TAG) == null) {
                 logger.info("Tagging and Saving Report Definition - {}",
                         bundleConfig.getBundleId());
-                measureBundle.getMeta().addTag(Constants.MainSystem, Constants.ReportDefinitionTag, null);
+                measureBundle.getMeta().addTag(Constants.MAIN_SYSTEM, Constants.REPORT_DEFINITION_TAG, null);
                 evaluationService.updateResource(measureBundle);
               } else {
                 logger.info("Report Definition - {} - already tagged",

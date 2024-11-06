@@ -37,8 +37,8 @@ public class ProvenanceHelper {
         activityConcept.addCoding(activity);
         provenance.setActivity(activityConcept);
 
-        provenance.getMeta().addTag(Constants.MainSystem,source,"File Download Source");
-        provenance.getMeta().addTag(Constants.MainSystem, fileType, "Type Of File Downloaded");
+        provenance.getMeta().addTag(Constants.MAIN_SYSTEM,source,"File Download Source");
+        provenance.getMeta().addTag(Constants.MAIN_SYSTEM, fileType, "Type Of File Downloaded");
         provenance.getMeta().addTag(activity);
 
         return provenance;

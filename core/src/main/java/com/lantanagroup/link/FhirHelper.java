@@ -296,10 +296,10 @@ public class FhirHelper {
 
   public static Practitioner toPractitioner(DecodedJWT jwt) {
     Practitioner practitioner = new Practitioner();
-    practitioner.getMeta().addTag(Constants.MainSystem, Constants.LinkUserTag, null);
+    practitioner.getMeta().addTag(Constants.MAIN_SYSTEM, Constants.LINK_USER_TAG, null);
     List<Identifier> identifiers = new ArrayList<>();
     Identifier identifier = new Identifier();
-    identifier.setSystem(Constants.MainSystem);
+    identifier.setSystem(Constants.MAIN_SYSTEM);
     identifier.setValue(jwt.getSubject());
     identifiers.add(identifier);
     practitioner.setIdentifier(identifiers);

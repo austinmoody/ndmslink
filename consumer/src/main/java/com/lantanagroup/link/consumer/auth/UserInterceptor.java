@@ -50,7 +50,7 @@ public class UserInterceptor {
 
       // retrieve all the roles for the user and stored them on requestDetails
       HashMap<String, String[]> map = new HashMap<>();
-      map.put(Constants.Roles, OAuth2Helper.getUserRoles(jwt));
+      map.put(Constants.ROLES, OAuth2Helper.getUserRoles(jwt));
       requestDetails.setParameters(map);
     } catch (Exception e) {
       e.printStackTrace();

@@ -57,7 +57,7 @@ public class ReportDefinitionControllerTest {
     componentListTest.add(measureEntryComponentTest);
     responseBundleTest.setEntry(componentListTest);
 
-    when(fhirDataProvider.searchBundleByTag(Constants.MainSystem, Constants.ReportDefinitionTag)).thenReturn(responseBundleTest);
+    when(fhirDataProvider.searchBundleByTag(Constants.MAIN_SYSTEM, Constants.REPORT_DEFINITION_TAG)).thenReturn(responseBundleTest);
     ApiConfig config = new ApiConfig();
     config.setMeasurePackages(new ArrayList<>());
     reportDefinitionControllerTest.setConfig(config);

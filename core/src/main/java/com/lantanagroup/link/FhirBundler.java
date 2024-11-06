@@ -49,7 +49,7 @@ public class FhirBundler {
 
     private Organization createOrganization() {
         Organization organization = new Organization();
-        organization.getMeta().addProfile(Constants.QiCoreOrganizationProfileUrl);
+        organization.getMeta().addProfile(Constants.QI_CORE_ORGANIZATION_PROFILE_URL);
 
         if (!StringUtils.isEmpty(this.config.getOrgNpi())) {
             organization.setId("" + this.config.getOrgNpi().hashCode());
@@ -69,7 +69,7 @@ public class FhirBundler {
 
         if (!StringUtils.isEmpty(this.config.getOrgNpi())) {
             organization.addIdentifier()
-                    .setSystem(Constants.NationalProviderIdentifierSystemUrl)
+                    .setSystem(Constants.NATIONAL_PROVIDER_IDENTIFIER_SYSTEM_URL)
                     .setValue(this.config.getOrgNpi());
         }
 
@@ -95,10 +95,10 @@ public class FhirBundler {
     private Bundle createBundle() {
         Bundle bundle = new Bundle();
         bundle.getMeta()
-                .addProfile(config.isMHL() ? Constants.MHLReportBundleProfileUrl : Constants.ReportBundleProfileUrl)
-                .addTag((config.isMHL() ? Constants.MHLSystem : Constants.MainSystem), "report", "Report");
+                .addProfile(config.isMHL() ? Constants.MHL_REPORT_BUNDLE_PROFILE_URL : Constants.REPORT_BUNDLE_PROFILE_URL)
+                .addTag((config.isMHL() ? Constants.MHL_SYSTEM : Constants.MAIN_SYSTEM), "report", "Report");
         bundle.getIdentifier()
-                .setSystem(Constants.IdentifierSystem)
+                .setSystem(Constants.IDENTIFIER_SYSTEM)
                 .setValue("urn:uuid:" + UUID.randomUUID());
         bundle.setType(config.getBundleType());
         bundle.setTimestamp(new Date());
@@ -121,22 +121,22 @@ public class FhirBundler {
 
         switch (resource.getResourceType()) {
             case Patient:
-                profile = Constants.QiCorePatientProfileUrl;
+                profile = Constants.QI_CORE_PATIENT_PROFILE_URL;
                 break;
             case Encounter:
-                profile = Constants.UsCoreEncounterProfileUrl;
+                profile = Constants.US_CORE_ENCOUNTER_PROFILE_URL;
                 break;
             case MedicationRequest:
-                profile = Constants.UsCoreMedicationRequestProfileUrl;
+                profile = Constants.US_CORE_MEDICATION_REQUEST_PROFILE_URL;
                 break;
             case Medication:
-                profile = Constants.UsCoreMedicationProfileUrl;
+                profile = Constants.US_CORE_MEDICATION_PROFILE_URL;
                 break;
             case Condition:
-                profile = Constants.UsCoreConditionProfileUrl;
+                profile = Constants.US_CORE_CONDITION_PROFILE_URL;
                 break;
             case Observation:
-                profile = Constants.UsCoreObservationProfileUrl;
+                profile = Constants.US_CORE_OBSERVATION_PROFILE_URL;
                 break;
         }
 
@@ -214,7 +214,7 @@ public class FhirBundler {
                         .filter(value -> value instanceof Reference)
                         .map(value -> (Reference) value);
         return Stream.concat(supplementalDataReferences, evaluatedResources)
-                .filter(reference -> reference.hasExtension(Constants.ExtensionCriteriaReference))
+                .filter(reference -> reference.hasExtension(Constants.EXTENSION_CRITERIA_REFERENCE))
                 .collect(Collectors.groupingBy(Reference::getReferenceElement, LinkedHashMap::new, Collectors.toList()));
     }
 

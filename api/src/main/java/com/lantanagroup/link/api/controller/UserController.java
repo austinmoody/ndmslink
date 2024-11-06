@@ -33,7 +33,7 @@ public class UserController extends BaseController {
     List<UserModel> users = new ArrayList<>();
 
     Bundle bundle = fhirDataProvider
-            .searchPractitioner(Constants.MainSystem, Constants.LinkUser);
+            .searchPractitioner(Constants.MAIN_SYSTEM, Constants.LINK_USER);
 
     if (bundle.getEntry().size() == 0) {
       logger.warn("No practitioners found in data store");
