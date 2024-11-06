@@ -1,5 +1,7 @@
 package com.lantanagroup.link.datastore.filter;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.web.util.matcher.IpAddressMatcher;
 
 import javax.servlet.*;
@@ -11,6 +13,7 @@ import java.util.List;
 public class IpFilter implements Filter {
     private final List<String> allowedIps;
     private final boolean filterEnabled;
+    private static final Logger logger = LoggerFactory.getLogger(IpFilter.class);
 
     public IpFilter(boolean enabled, List<String> allowedIps) {
         this.filterEnabled = enabled;
@@ -39,6 +42,7 @@ public class IpFilter implements Filter {
         }
 
         if (!isAllowed) {
+            logger.info("IP Address {} Not Allowed", httpRequest.getRemoteAddr());
             httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
             return;
         }
