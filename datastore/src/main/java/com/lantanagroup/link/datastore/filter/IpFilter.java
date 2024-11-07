@@ -24,6 +24,7 @@ public class IpFilter implements Filter {
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
 
         if (!filterEnabled) {
+            logger.info("IP Address Filtering Not Enabled");
             chain.doFilter(request, response);
             return;
         }
@@ -36,13 +37,14 @@ public class IpFilter implements Filter {
         for (String ip : allowedIps) {
             IpAddressMatcher matcher = new IpAddressMatcher(ip);
             if (matcher.matches(httpRequest)) {
+                logger.info("IP Address {} Allowed", httpRequest.getRemoteAddr());
                 isAllowed = true;
                 break;
             }
         }
 
         if (!isAllowed) {
-            logger.info("IP Address {} Not Allowed", httpRequest.getRemoteAddr());
+            logger.info("IP Address {} NOT Allowed", httpRequest.getRemoteAddr());
             httpResponse.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
             return;
         }
