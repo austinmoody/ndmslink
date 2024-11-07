@@ -37,7 +37,6 @@ public class IpFilter implements Filter {
         for (String ip : allowedIps) {
             IpAddressMatcher matcher = new IpAddressMatcher(ip);
             if (matcher.matches(httpRequest)) {
-                logger.info("IP Address {} Allowed", httpRequest.getRemoteAddr());
                 isAllowed = true;
                 break;
             }
