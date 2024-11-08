@@ -62,4 +62,9 @@ public class Constants {
           .setDisplay("NDMS Aggregate Measure Report")
           .setSystem(Constants.MAIN_SYSTEM);
 
+  public static final Coding NDMS_CURRENT_AGGREGATE_MEASURE_REPORT = new Coding()
+          .setCode("ndms-current-aggregate-measure-report")
+          .setDisplay("NDMS Current Aggregate Measure Report")
+          .setSystem(Constants.MAIN_SYSTEM);
+
 }

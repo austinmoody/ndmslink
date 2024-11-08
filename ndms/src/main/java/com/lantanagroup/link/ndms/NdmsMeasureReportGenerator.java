@@ -154,9 +154,6 @@ public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
         // Add  Organization Information to MeasureReport
         ndmsUtility.addLocationSubjectToMeasureReport(masterMeasureReport, reportContext.getReportLocation());
 
-        // Tag "Master" MeasureReport
-        masterMeasureReport.getMeta().addTag(Constants.NDMS_AGGREGATE_MEASURE_REPORT);
-
         measureContext.setMeasureReport(masterMeasureReport);
 
     }
@@ -164,7 +161,19 @@ public class NdmsMeasureReportGenerator implements IMeasureReportGenerator {
     @Override
     public void store(ReportContext.MeasureContext measureContext, ReportContext reportContext) {
         measureContext.getPatientReports().forEach(report -> reportContext.getFhirProvider().updateResource(report));
-        reportContext.getFhirProvider().updateResource(measureContext.getMeasureReport());
+
+
+        // Tag & Store aggregated report
+        MeasureReport aggregatedReport = measureContext.getMeasureReport();
+        aggregatedReport.getMeta().addTag(Constants.NDMS_AGGREGATE_MEASURE_REPORT);
+        reportContext.getFhirProvider().updateResource(aggregatedReport);
+
+        // Tag as the "current" report
+        aggregatedReport.getMeta().addTag(Constants.NDMS_CURRENT_AGGREGATE_MEASURE_REPORT);
+        // Update ID to be for the Location
+        aggregatedReport.setId(reportContext.getReportLocation().getIdElement().getIdPart());
+        reportContext.getFhirProvider().updateResource(aggregatedReport);
+
     }
 
     private static boolean hasRelevantLocation(Encounter encounter, Date startDate, Date endDate) {
