@@ -125,6 +125,17 @@ public class CsvProcessorController extends BaseController {
 
             // Loop & Store the MeasureReport(s)
             for (MeasureReport measureReport : measureReports) {
+                // Tag & Store aggregated report
+                measureReport.getMeta().addTag(Constants.NDMS_AGGREGATE_MEASURE_REPORT);
+                fhirDataProvider.updateResource(measureReport);
+
+                // Tag as Current, set ID to Location & store
+                measureReport.getMeta().addTag(Constants.NDMS_CURRENT_AGGREGATE_MEASURE_REPORT);
+                // TODO - find a better way, this is so gross.  We essentially need to know
+                // the Location ID/Name in order to save the maybe we save as a tag?
+                measureReport.setId(
+                        measureReport.getSubject().getReference().replace("Location/","")
+                );
                 fhirDataProvider.updateResource(measureReport);
             }
 

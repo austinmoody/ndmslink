@@ -306,10 +306,6 @@ public class MethodistCsvProcessor implements ICsvProcessor {
         // Add  Organization Information to MeasureReport
         ndmsUtility.addLocationSubjectToMeasureReport(measureReport, location);
 
-        // Tag "Master" MeasureReport
-        measureReport.getMeta().addTag(Constants.NDMS_AGGREGATE_MEASURE_REPORT);
-
-
         return measureReport;
     }
 
