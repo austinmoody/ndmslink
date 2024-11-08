@@ -94,18 +94,6 @@ public class ApiConfig {
   private Boolean checkIpAddress = true;
 
   /**
-   * <strong>api.downloader</strong><br>The class used to download reports
-   */
-  @NotNull
-  private String downloader;
-
-  /**
-   * <strong>api.sender</strong><br>The class used to send reports
-   */
-  @NotNull
-  private String sender;
-
-  /**
    * <strong>api.patient-id-resolver</strong><br>The class used to determine the list of patient ids that should be queried for
    */
   private String patientIdResolver;
@@ -168,6 +156,8 @@ public class ApiConfig {
    * <strong>api.skip-query</strong><br>Whether to skip the query phase of report generation; useful if patient data bundles have already been stored.
    */
   private boolean skipQuery = false;
+
+  private ApiPublishers publishers;
 
   public boolean validDataProcessor(String source, String type) {
     if (getDataProcessor() == null || getDataProcessor().get(source) == null || getDataProcessor().get(source).equals("")) {
