@@ -4,6 +4,8 @@ import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.*;
 import com.lantanagroup.link.api.ApiUtility;
 import com.lantanagroup.link.auth.LinkCredentials;
+import com.lantanagroup.link.config.publisher.FhirPublisherConfig;
+import com.lantanagroup.link.config.publisher.PublisherOutcome;
 import com.lantanagroup.link.config.query.QueryConfig;
 import com.lantanagroup.link.config.query.USCoreConfig;
 import com.lantanagroup.link.model.*;
@@ -34,8 +36,6 @@ import java.util.concurrent.Executors;
 @RequestMapping("/api/report")
 public class ReportController extends BaseController {
   private static final Logger logger = LoggerFactory.getLogger(ReportController.class);
-  private static final String PERIOD_START_PARAM_NAME = "periodStart";
-  private static final String PERIOD_END_PARAM_NAME = "periodEnd";
 
   // Disallow binding of sensitive attributes
   final String[] disallowedFields = new String[]{};
@@ -289,5 +289,99 @@ public class ReportController extends BaseController {
       dataProvider.updateResource(task);
     }
   }
+
+  @PostMapping(value = {"/publish/{publisherType}/{reportId}"})
+  public ResponseEntity<Object> publishReport(
+          @AuthenticationPrincipal LinkCredentials user,
+          HttpServletRequest request,
+          @PathVariable String publisherType,
+          @PathVariable String reportId
+  ) {
+
+    // Check and see if the publisher "type" is actually a thing that is configured
+    // and fail before we bother going any farther
+    if (!config.getPublishers().publisherConfigured(publisherType)) {
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+              String.format("Publisher type '%s' not supported", publisherType)
+      );
+    }
+
+    Task task = TaskHelper.getNewTask(user, request, Constants.PUBLISH_MEASURE_REPORT);
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
+
+    ApiUtility.addNoteToTask(task,
+            String.format("Begin Report Publish, Report ID '%s' using '%s'", reportId, publisherType)
+    );
+
+    fhirDataProvider.updateResource(task);
+
+    // TODO thread it
+    publishReport(user, task.getId(), publisherType, reportId);
+
+    return ResponseEntity.ok(new Job(task));
+  }
+
+  private void publishReport(LinkCredentials user, String taskId, String publisherType, String reportId) {
+    FhirDataProvider fhirDataProvider = getFhirDataProvider();
+    Task task = fhirDataProvider.getTaskById(taskId);
+
+    try {
+
+      ApiUtility.addNoteToTask(
+              task,
+              String.format("MeasureReport with id %s retrieved and ready to send", reportId)
+      );
+      MeasureReport measureReport = fhirDataProvider.getMeasureReportById(reportId);
+
+      // TODO - find config from publishers by name
+      PublisherOutcome outcome = new PublisherOutcome();
+      if (publisherType.equals("fhir")) {
+        String publisherClassName = config.getPublishers().getFhir().getPublisher();
+        Class<?> publisherClass = Class.forName(publisherClassName);
+        @SuppressWarnings("unchecked")
+        IMeasureReportPublisher<FhirPublisherConfig> publisher = (IMeasureReportPublisher<FhirPublisherConfig>) context.getBean(publisherClass);
+        outcome = publisher.publish(config.getPublishers().getFhir(), measureReport);
+      } else {
+        outcome.setSuccess(false);
+        outcome.setMessage(
+                String.format("Publisher type %s not supported", publisherType)
+        );
+      }
+
+      if (outcome.isSuccess()) {
+        ApiUtility.addNoteToTask(
+                task,
+                String.format("MeasureReport successfully published to %s", outcome.getPublishedLocation())
+        );
+      } else {
+        ApiUtility.addNoteToTask(
+                task,
+                String.format("MeasureReport failed to publish: %s", outcome.getPublishedLocation())
+        );
+      }
+
+      task.setStatus(Task.TaskStatus.COMPLETED);
+
+      this.getFhirDataProvider().audit(task,
+              user.getJwt(),
+              FhirHelper.AuditEventTypes.PUBLISH_MEASUREREPORT,
+              "Successfully Initiated MeasureReport Publish");
+    } catch (Exception ex) {
+      String errorMessage = String.format("Issue with sendReport: %s", ex.getMessage());
+      logger.error(errorMessage);
+      Annotation note = new Annotation();
+      note.setText(errorMessage);
+      note.setTime(new Date());
+      task.addNote(note);
+      task.setStatus(Task.TaskStatus.FAILED);
+    } finally {
+      task.setLastModified(new Date());
+      fhirDataProvider.updateResource(task);
+    }
+
+  }
+
+  // TODO - maybe add API endpoint to provide list of configured Publishers, otherwise one would
+  // have to know the deployed configuration
 
 }

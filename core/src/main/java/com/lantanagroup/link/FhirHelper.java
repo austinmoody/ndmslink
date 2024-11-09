@@ -603,6 +603,7 @@ public class FhirHelper {
     TOTALS_CREATE_UPDATE,
     CSV_TO_MEASUREREPORT_CONVERSION,
     PATIENT_LIST_PULL,
+    PUBLISH_MEASUREREPORT,
     SearchLocations,
     InitiateQuery,
     SearchReports,
