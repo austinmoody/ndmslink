@@ -12,6 +12,7 @@ import com.lantanagroup.link.config.publisher.FhirPublisherAuthType;
 import com.lantanagroup.link.config.publisher.FhirPublisherConfig;
 import com.lantanagroup.link.config.publisher.PublisherOutcome;
 import org.hl7.fhir.r4.model.MeasureReport;
+import org.hl7.fhir.r4.model.Meta;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -37,6 +38,10 @@ public class FhirPublisher implements IMeasureReportPublisher<FhirPublisherConfi
             }
 
             FhirDataProvider outboundFhir = new FhirDataProvider(client);
+
+            // Blank out version of report we are sending to force update on
+            // server that we are publishing to.
+            report.setMeta(new Meta().setVersionId(null));
 
             MethodOutcome updateOutcome = outboundFhir.updateResource(report);
 
