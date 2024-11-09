@@ -5,6 +5,7 @@ import com.lantanagroup.link.*;
 import com.lantanagroup.link.api.ApiUtility;
 import com.lantanagroup.link.auth.LinkCredentials;
 import com.lantanagroup.link.config.publisher.FhirPublisherConfig;
+import com.lantanagroup.link.config.publisher.PublisherOutcome;
 import com.lantanagroup.link.config.query.QueryConfig;
 import com.lantanagroup.link.config.query.USCoreConfig;
 import com.lantanagroup.link.model.*;
@@ -15,7 +16,6 @@ import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
-import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -44,8 +44,6 @@ public class ReportController extends BaseController {
   private final EventService eventService;
   private final ApplicationContext context;
   private final StopwatchManager stopwatchManager;
-  private final ConfigurableEnvironment environment;
-  //private final FhirPublisherConfig fhirPublisherConfig;
 
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
@@ -53,15 +51,13 @@ public class ReportController extends BaseController {
           ApplicationContext context,
           EventService eventService,
           USCoreConfig usCoreConfig,
-          StopwatchManager stopwatchManager,
-          ConfigurableEnvironment environment
+          StopwatchManager stopwatchManager
   ) {
     super();
     this.context = context;
     this.eventService = eventService;
     this.usCoreConfig = usCoreConfig;
     this.stopwatchManager = stopwatchManager;
-    this.environment = environment;
   }
 
   @PreDestroy
@@ -294,7 +290,7 @@ public class ReportController extends BaseController {
     }
   }
 
-  @PostMapping(value={"/publish/{publisherType}/{reportId}"})
+  @PostMapping(value = {"/publish/{publisherType}/{reportId}"})
   public ResponseEntity<Object> publishReport(
           @AuthenticationPrincipal LinkCredentials user,
           HttpServletRequest request,
@@ -302,72 +298,25 @@ public class ReportController extends BaseController {
           @PathVariable String reportId
   ) {
 
-    /*
-
-      Currently the setup for this in the application.yml will look something like:
-          publisher:
-            fhir:
-              url: https://thsa1.sanerproject.org:10442/fhir
-              publisher: com.lantanagroup.link.ndms.publisher.FhirPublisher
-              auth-type: BASIC
-              auth-options:
-                username: <REMOVED>
-                password: <REMOVED>
-            sftp:
-              host: sftp.ainq.com
-              port: 2022
-              username: <REMOVED>
-              password: <REMOVED>
-
-
-        So basically 1 API can be configured with 1 "type" of Publisher.  1 FHIR publisher.  1 SFTP publisher...1 whatever
-
-        The level below publisher would need to be added to code here to work.
-
-        Eventually (if we need it) this could be made more dynamic so you potentially could call an  endpoint and have the
-        report published to one FHIR server, call the endpoint different and have it published to a different FHIR server.
-
-        Maybe send a payload with a key to configuration.  Something.
-
-        But we are slamming up against the deadline, unfortunately.
-     */
+    // Check and see if the publisher "type" is actually a thing that is configured
+    // and fail before we bother going any farther
+    if (!config.getPublishers().publisherConfigured(publisherType)) {
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+              String.format("Publisher type '%s' not supported", publisherType)
+      );
+    }
 
     Task task = TaskHelper.getNewTask(user, request, Constants.PUBLISH_MEASURE_REPORT);
     FhirDataProvider fhirDataProvider = getFhirDataProvider();
 
-    try {
+    ApiUtility.addNoteToTask(task,
+            String.format("Begin Report Publish, Report ID '%s' using '%s'", reportId, publisherType)
+    );
 
-      ApiUtility.addNoteToTask(task,
-              String.format("Begin Report Publish, Report ID '%s' using Sender '%s'", reportId, publisherType)
-      );
+    fhirDataProvider.updateResource(task);
 
-      // Check and see if the publisher "type" is actually a thing that is configured
-      // and fail before we bother going any farther
-      if (!publisherType.equals("fhir")) {
-        throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                String.format("Publisher type '%s' not supported", publisherType));
-      }
-
-      fhirDataProvider.updateResource(task);
-
-      // TODO thread it
-      publishReport(user, task.getId(), publisherType, reportId);
-
-    } catch (Exception ex) {
-      String errorMessage = String.format("Issue with publishing report: %s", ex.getMessage());
-      logger.error(errorMessage);
-      task.addNote(
-              new Annotation()
-                      .setText(errorMessage)
-                      .setTime(new Date())
-      );
-      task.setStatus(Task.TaskStatus.FAILED);
-      return ResponseEntity.badRequest().body(new Job(task));
-    } finally {
-      task.setLastModified(new Date());
-      fhirDataProvider.updateResource(task);
-    }
+    // TODO thread it
+    publishReport(user, task.getId(), publisherType, reportId);
 
     return ResponseEntity.ok(new Job(task));
   }
@@ -377,20 +326,41 @@ public class ReportController extends BaseController {
     Task task = fhirDataProvider.getTaskById(taskId);
 
     try {
-      MeasureReport measureReport = fhirDataProvider.getMeasureReportById(reportId);
-
-      if (publisherType.equals("fhir")) {
-        String publisherClassName = config.getPublishers().getFhir().getPublisher();
-        Class<?> publisherClass = Class.forName(publisherClassName);
-        @SuppressWarnings("unchecked")
-        IMeasureReportPublisher<FhirPublisherConfig> publisher = (IMeasureReportPublisher<FhirPublisherConfig>) context.getBean(publisherClass);
-        publisher.publish(config.getPublishers().getFhir(), measureReport);
-      }
 
       ApiUtility.addNoteToTask(
               task,
               String.format("MeasureReport with id %s retrieved and ready to send", reportId)
       );
+      MeasureReport measureReport = fhirDataProvider.getMeasureReportById(reportId);
+
+      // TODO - find config from publishers by name
+      PublisherOutcome outcome = new PublisherOutcome();
+      if (publisherType.equals("fhir")) {
+        String publisherClassName = config.getPublishers().getFhir().getPublisher();
+        Class<?> publisherClass = Class.forName(publisherClassName);
+        @SuppressWarnings("unchecked")
+        IMeasureReportPublisher<FhirPublisherConfig> publisher = (IMeasureReportPublisher<FhirPublisherConfig>) context.getBean(publisherClass);
+        outcome = publisher.publish(config.getPublishers().getFhir(), measureReport);
+      } else {
+        outcome.setSuccess(false);
+        outcome.setMessage(
+                String.format("Publisher type %s not supported", publisherType)
+        );
+      }
+
+      if (outcome.isSuccess()) {
+        ApiUtility.addNoteToTask(
+                task,
+                String.format("MeasureReport successfully published to %s", outcome.getPublishedLocation())
+        );
+      } else {
+        ApiUtility.addNoteToTask(
+                task,
+                String.format("MeasureReport failed to publish: %s", outcome.getPublishedLocation())
+        );
+      }
+
+      task.setStatus(Task.TaskStatus.COMPLETED);
 
       this.getFhirDataProvider().audit(task,
               user.getJwt(),
@@ -410,5 +380,8 @@ public class ReportController extends BaseController {
     }
 
   }
+
+  // TODO - maybe add API endpoint to provide list of configured Publishers, otherwise one would
+  // have to know the deployed configuration
 
 }
