@@ -14,8 +14,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.TimeZone;
 
@@ -29,11 +27,8 @@ import java.util.TimeZone;
         "com.lantanagroup.link.auth",
         "com.lantanagroup.link.config",
         "com.lantanagroup.link.config.api",
-        "com.lantanagroup.link.mhl",
-        "com.lantanagroup.link.nhsn",
         "com.lantanagroup.link.query",
-        "com.lantanagroup.link.spring",
-        "com.lantanagroup.link.thsa"
+        "com.lantanagroup.link.spring"
 })
 public class ApiApplication extends SpringBootServletInitializer implements InitializingBean {
   @Autowired
