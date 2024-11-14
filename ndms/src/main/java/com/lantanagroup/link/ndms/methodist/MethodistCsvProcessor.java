@@ -10,6 +10,7 @@ import com.lantanagroup.link.config.api.ApiDataStoreConfig;
 import com.lantanagroup.link.config.api.CsvProcessor;
 import com.lantanagroup.link.csv.ICsvProcessor;
 import com.lantanagroup.link.model.ReportCriteria;
+import com.lantanagroup.link.ndms.MeasureReportSort;
 import com.lantanagroup.link.ndms.NdmsConstants;
 import com.lantanagroup.link.ndms.NdmsUtility;
 import com.opencsv.bean.CsvToBean;
@@ -305,6 +306,8 @@ public class MethodistCsvProcessor implements ICsvProcessor {
 
         // Add  Organization Information to MeasureReport
         ndmsUtility.addLocationSubjectToMeasureReport(measureReport, location);
+
+        MeasureReportSort.sortMeasureReportGroups(measureReport);
 
         return measureReport;
     }
