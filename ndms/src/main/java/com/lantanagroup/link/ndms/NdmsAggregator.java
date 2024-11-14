@@ -148,6 +148,8 @@ public class NdmsAggregator implements IReportAggregator {
             masterMeasureReport.addGroup(grp);
         });
 
+        MeasureReportSort.sortMeasureReportGroups(masterMeasureReport);
+
         return masterMeasureReport;
     }
 
