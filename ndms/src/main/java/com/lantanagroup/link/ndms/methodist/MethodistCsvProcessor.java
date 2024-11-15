@@ -2,7 +2,6 @@ package com.lantanagroup.link.ndms.methodist;
 
 import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
-import com.lantanagroup.link.Constants;
 import com.lantanagroup.link.FhirDataProvider;
 import com.lantanagroup.link.Helper;
 import com.lantanagroup.link.ReportIdHelper;
@@ -29,8 +28,6 @@ import java.util.stream.Collectors;
 @Component
 public class MethodistCsvProcessor implements ICsvProcessor {
     private static final Logger logger = LoggerFactory.getLogger(MethodistCsvProcessor.class);
-    // TODO - remove when we aren't just making up mappings any longer
-    private static final Random random = new Random();
     private FhirDataProvider fhirDataProvider;
     private FhirDataProvider fhirEvalService;
     private List<String> removeBedTypes;
@@ -65,14 +62,13 @@ public class MethodistCsvProcessor implements ICsvProcessor {
                 .withIgnoreLeadingWhiteSpace(true)
                 .build();
 
+        // Parse the entire CSV
+        // We will loop each facility but, obviously, only work on active beds
+        // So we may end up with some MeasureReports for facilities w/o any
+        // totals if the beds are inactive for NDMS.
         List<MethodistDataModel> methodistDataModelList = csvToBean.parse();
 
         logger.info("Methodist CSV has {} entries", methodistDataModelList.size());
-
-        // Map the TRAC2ES code for each in the list.
-        // NOTE that we do not have mapping strategy from source yet.  So function called below at this time
-        // is completely random in order to work out creation of MeasureReport
-        mapTrac2es(methodistDataModelList);
 
         /*
             These are the Bed Status types for Methodist
@@ -105,8 +101,13 @@ public class MethodistCsvProcessor implements ICsvProcessor {
                 .collect(Collectors.groupingBy(MethodistDataModel::getFacility))
                 .forEach((facility, dataList) -> {
                     Location location = getLocationByName(facility);
+                    // Pull out location's active beds
+                    List<MethodistDataModel> activeBeds = dataList.stream()
+                            .filter(
+                                    bed -> bed.getActive().equalsIgnoreCase("ACTIVE")
+                            ).collect(Collectors.toList());
                     try {
-                        measureReports.add(generateMeasureReportForFacility(reportCriteria, location, dataList));
+                        measureReports.add(generateMeasureReportForFacility(reportCriteria, location, activeBeds));
                     } catch (ParseException e) {
                         throw new InternalErrorException(e);
                     }
@@ -363,19 +364,5 @@ public class MethodistCsvProcessor implements ICsvProcessor {
         overallGroup.addPopulation(populationGroup);
 
         return overallGroup;
-    }
-
-    private void mapTrac2es(List<MethodistDataModel> methodistList) {
-        // TODO once we get details from Source
-        assignRandomTrac2es(methodistList);
-    }
-
-    public static void assignRandomTrac2es(List<MethodistDataModel> models) {
-        List<String> trac2esCodes = Arrays.asList(
-                "CC", "MM-SS", "MP", "SBN", "MC", "PICU", "NPU"
-        );
-        models.forEach(model ->
-                model.setTrac2es(trac2esCodes.get(random.nextInt(trac2esCodes.size())))
-        );
     }
 }
